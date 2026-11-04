@@ -1,7 +1,7 @@
 {
   "name": "nix",
   "version": "2.35.4",
-  "release": 7,
+  "release": 8,
   "deps": [
     "nlohmann-json"
   ],
@@ -15,7 +15,7 @@
     "libbrotlidec.so.1",
     "libbrotlienc.so.1",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.36,GLIBC_2.38,GLIBC_2.4,GLIBC_2.5,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
-    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libcrypto.so.4@OPENSSL_4.0.0",
     "libcurl.so.4",
     "libgcc_s.so.1@{GCC_3.0,GCC_3.3}",
     "libgit2.so.1.9",

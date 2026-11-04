@@ -1,16 +1,16 @@
 {
   "name": "wpa_supplicant",
   "version": "2.12",
-  "release": 4,
+  "release": 5,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4}",
-    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libcrypto.so.4@{OPENSSL_4.0.0,OPENSSL_4.1.0}",
     "libdbus-1.so.3@LIBDBUS_1_3",
     "libnl-3.so.200@{libnl_3,libnl_3_2_27}",
     "libnl-genl-3.so.200@libnl_3",
     "libreadline.so.8",
-    "libssl.so.3@{OPENSSL_3.0.0,OPENSSL_3.4.0}"
+    "libssl.so.4@OPENSSL_4.0.0"
   ],
   "provides_soname": [],
   "build_deps": [

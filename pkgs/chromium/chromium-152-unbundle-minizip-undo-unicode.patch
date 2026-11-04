@@ -7,12 +7,9 @@ The fields come from chromium's patches on minizip
 ---
  third_party/zlib/google/zip_reader.cc | 34 +--------------------------
  1 file changed, 1 insertion(+), 33 deletions(-)
-
-diff --git a/third_party/zlib/google/zip_reader.cc b/third_party/zlib/google/zip_reader.cc
-index 7b5b28967cfbb..2054e3c09e419 100644
 --- a/third_party/zlib/google/zip_reader.cc
 +++ b/third_party/zlib/google/zip_reader.cc
-@@ -314,32 +314,6 @@ bool ZipReader::OpenEntry() {
+@@ -314,32 +314,6 @@
    bool physical_path_is_directory = false;
    bool physical_path_is_unsafe = false;
  
@@ -45,7 +42,7 @@ index 7b5b28967cfbb..2054e3c09e419 100644
    // Convert path from original encoding to Unicode.
    std::u16string path_in_utf16;
    if (!base::CodepageToUTF16(entry_.path_in_original_encoding,
-@@ -353,13 +327,7 @@ bool ZipReader::OpenEntry() {
+@@ -353,13 +327,7 @@
    // Normalize path.
    Normalize(path_in_utf16);
  

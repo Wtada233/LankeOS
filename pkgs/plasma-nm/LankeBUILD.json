@@ -1,7 +1,7 @@
 {
   "name": "plasma-nm",
   "version": "6.8.2",
-  "release": 5,
+  "release": 6,
   "deps": [
     "kf-kquickcharts",
     "kirigami-addons",
@@ -41,7 +41,7 @@
     "libQt6Widgets.so.6@Qt_6",
     "libQt6Xml.so.6@Qt_6",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
-    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libcrypto.so.4@OPENSSL_4.0.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libnm.so.0@{libnm_1_0_0,libnm_1_20_0,libnm_1_2_0,libnm_1_40_0}",

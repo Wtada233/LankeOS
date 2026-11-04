@@ -30,7 +30,9 @@
     "ninja",
     "sqlite",
     "zlib",
-    "zstd"
+    "zstd",
+    "krb5",
+    "vala"
   ],
   "sources": [
     "https://download.gnome.org/sources/libsoup/3.8/libsoup-3.8.1.tar.xz"

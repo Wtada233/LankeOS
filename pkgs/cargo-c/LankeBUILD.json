@@ -1,7 +1,7 @@
 {
   "name": "cargo-c",
   "version": "0.10.26",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -10,7 +10,7 @@
     "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0}",
     "libgit2.so.1.9",
     "libm.so.6@{GLIBC_2.27,GLIBC_2.29}",
-    "libssl.so.3@OPENSSL_3.0.0"
+    "libssl.so.4@OPENSSL_4.0.0"
   ],
   "provides_soname": [],
   "build_deps": [

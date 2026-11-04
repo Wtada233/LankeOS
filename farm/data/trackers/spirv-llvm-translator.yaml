@@ -8,3 +8,10 @@ sources:
     tag-prefix: v
     template: https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/{tag}.tar.gz
     major-of: llvm
+  - tracker-template: script
+    version-var:
+      ver: sources[0]
+    script: |
+      tag=$(curl -fsSL "https://raw.githubusercontent.com/KhronosGroup/SPIRV-LLVM-Translator/v${ver}/spirv-headers-tag.conf")
+      test -n "$tag" || exit 1
+      echo "${ver}|https://github.com/KhronosGroup/SPIRV-Headers/archive/${tag}.tar.gz"

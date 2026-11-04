@@ -1,6 +1,6 @@
 {
   "name": "nghttp2",
-  "version": "1.70.0",
+  "version": "1.71.0",
   "release": 3,
   "deps": [
     "python"
@@ -16,7 +16,8 @@
     "base-devel"
   ],
   "sources": [
-    "https://github.com/nghttp2/nghttp2/releases/download/v1.70.0/nghttp2-1.70.0.tar.xz"
+    "https://github.com/nghttp2/nghttp2/releases/download/v1.71.0/nghttp2-1.71.0.tar.xz"
   ],
-  "no_strip": false
+  "no_strip": false,
+  "work_sources": []
 }

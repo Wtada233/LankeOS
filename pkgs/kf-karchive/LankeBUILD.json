@@ -1,13 +1,13 @@
 {
   "name": "kf-karchive",
   "version": "6.31.0",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libbz2.so.1.0",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
-    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libcrypto.so.4@OPENSSL_4.0.0",
     "liblzma.so.5@{XZ_5.0,XZ_5.4}",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}",
     "libz.so.1",

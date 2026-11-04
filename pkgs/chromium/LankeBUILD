@@ -117,7 +117,8 @@ lankebuild_prepare() {
         chromium-153-iamf-tools-unbundled-opus.patch \
         chromium-156-revert-gn-check-includes.patch \
         chromium-156-isolatedDeclarations.patch \
-        openxr-vendored-vulkan-headers.patch; do
+        openxr-vendored-vulkan-headers.patch \
+        chromium-157-unbundle-brotli-headers.patch; do
         if patch -Np1 --dry-run -i "$_BD/$_p" >/dev/null 2>&1; then
             patch -Np1 -i "$_BD/$_p"
         elif patch -Np1 -R --dry-run -i "$_BD/$_p" >/dev/null 2>&1; then

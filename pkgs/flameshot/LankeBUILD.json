@@ -1,6 +1,6 @@
 {
   "name": "flameshot",
-  "version": "14.0.0",
+  "version": "15.0.0",
   "release": 2,
   "deps": [
     "qt6-imageformats",
@@ -30,7 +30,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://github.com/flameshot-org/flameshot/archive/refs/tags/v14.0.0/flameshot-14.0.0.tar.gz"
+    "https://github.com/flameshot-org/flameshot/archive/refs/tags/v15.0.0/flameshot-15.0.0.tar.gz"
   ],
   "work_sources": []
 }

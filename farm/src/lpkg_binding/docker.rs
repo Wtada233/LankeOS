@@ -548,10 +548,16 @@ impl RealBinding {
         Ok(())
     }
 
-    /// 容器内 `lpkg build -y --use-system-soname`（流式日志）。
+    /// 容器内 `lpkg build -y --use-system-soname --missing-so-no-error`（流式日志）。
     /// `--use-system-soname`：build 的 needed_so 检测命中 /usr/lib 里备份恢复的旧 .so。
+    /// `--missing-so-no-error`：build_deps 里尚未重编的包仍声明旧 SONAME（如 openssl 3→4 时
+    /// git 仍写 libcrypto.so.3@OPENSSL_3.0.0）时，求解器容忍其缺失 provider。系统伪 provider
+    /// （`@system-sonames`）只登记裸 SONAME，满足不了带符号版本的 need，单靠
+    /// `--use-system-soname` 过不了求解。与 upgrade 的过渡期语义保持一致，否则构建会死锁——
+    /// 重编依赖前得先能装上它们。
     fn run_lpkg_build(&self, pkg: &str, cid: &str) -> Result<(), FarmError> {
-        let build_script = format!("cd /work/{pkg} && lpkg build -y --use-system-soname");
+        let build_script =
+            format!("cd /work/{pkg} && lpkg build -y --use-system-soname --missing-so-no-error");
         let status = docker_stream(&["exec", cid, "sh", "-c", &build_script])
             .map_err(|e| crate::tr!("docker.exec_failed", e))?;
         if !status.success() {

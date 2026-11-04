@@ -1,14 +1,15 @@
 {
   "name": "minizip-ng",
   "version": "4.2.2",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libbz2.so.1.0",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_ABI_DT_RELR}",
-    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libcrypto.so.4@OPENSSL_4.0.0",
     "liblzma.so.5@XZ_5.0",
-    "libz.so.1"
+    "libz.so.1",
+    "libzstd.so.1"
   ],
   "provides_soname": [
     "libminizip-ng.so",
@@ -20,7 +21,8 @@
     "ninja",
     "zlib",
     "bzip2",
-    "xz"
+    "xz",
+    "zstd"
   ],
   "sources": [
     "https://github.com/zlib-ng/minizip-ng/archive/refs/tags/4.2.2.tar.gz"

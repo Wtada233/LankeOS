@@ -12,6 +12,7 @@ lankebuild_build() {
     # 对齐 Arch 打包参数。差异：
     #   - 无 libfido2 包 → 去掉 --with-security-key-builtin
     #   - 默认 PATH 遵循 LankeOS login.defs（/usr/bin，不含 /usr/local）
+    #   - OpenSSL 4 已移除 ENGINE，不能再传 --with-ssl-engine
     ./configure \
         --disable-lastlog \
         --libexecdir=/usr/lib/ssh \
@@ -25,7 +26,6 @@ lankebuild_build() {
         --with-pid-dir=/run \
         --with-privsep-path=/usr/share/empty.sshd \
         --with-privsep-user=nobody \
-        --with-ssl-engine \
         --with-xauth=/usr/bin/xauth \
         --without-zlib-version-check
     make -j$(nproc)

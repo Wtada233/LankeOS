@@ -6,4 +6,3 @@ sources:
     mode: tags
     tag-prefix: openssl-
     template: https://github.com/openssl/openssl/releases/download/{tag}/{name}-{version}.tar.gz
-    major-version-lock: "3"

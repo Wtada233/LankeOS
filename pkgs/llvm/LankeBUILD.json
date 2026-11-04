@@ -1,6 +1,6 @@
 {
   "name": "llvm",
-  "version": "23.1.4",
+  "version": "23.1.5",
   "release": 4,
   "deps": [
     "perl",
@@ -16,7 +16,8 @@
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.38,GLIBC_2.44}",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.3,CXXABI_1.3.5,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.9}",
     "libxml2.so.16",
-    "libz.so.1@ZLIB_1.2.0"
+    "libz.so.1@ZLIB_1.2.0",
+    "libzstd.so.1"
   ],
   "provides_soname": [
     "LLVMgold.so@LLVM_23.1",
@@ -40,7 +41,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.4/llvm-project-23.1.4.src.tar.xz"
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.5/llvm-project-23.1.5.src.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false,

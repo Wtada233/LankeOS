@@ -175,11 +175,12 @@ extract 后 `grep -rla "Qt_6_PRIVATE_API"` 命中即 echo 包名。这覆盖 **Q
    lpkg install lpkg -y && \
    ( lpkg upgrade -y --missing-so-no-error || { echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; } ) || exit 1 ; \
    [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig ; \
-   lpkg build -y --use-system-soname
+   lpkg build -y --use-system-soname --missing-so-no-error
    ```
    - `upgrade` 失败（含 force-solve-conflict 重试）→ `|| exit 1` 致命，不继续 build
    - `--missing-so-no-error`：bootstrap/过渡期容忍缺失 SONAME（lpkg 前向 `check_forward_soname_integrity` 与后向 `check_needed_so_consistency` **都纳入该 flag**；真实系统不带 flag 仍硬抛，不变量保留）
    - 备份恢复后 `--use-system-soname`：build 的 needed_so 检测命中 /usr/lib 里备份的旧 .so
+   - build 同样带 `--missing-so-no-error`：`@system-sonames` 伪 provider 只登记裸 SONAME，满足不了 `libcrypto.so.3@OPENSSL_3.0.0` 这类带符号版本的 need；缺 flag 时 build_deps 里尚未重编的包会让求解硬失败
    - **dev symlink（`xxx.so`）指向新 so → 新构建完美链接新 so；旧二进制链旧 SONAME 在过渡期加载备份的旧 so**——新旧两条 ABI 并行存活到全部重建完
 6. `docker cp` 产物回宿主 staging
 
@@ -360,7 +361,7 @@ seed ──> out/<arch>/
 
 build --all ──> run_build
   needs_build 过滤 → topo_order(确定性，三类边) → 计划预览+确认 → bulk 预下载(确认集)
-  └─ 逐包: 源就绪门(非victim) → docker build(upgrade --missing-so-no-error + 备份恢复 + build --use-system-soname)
+  └─ 逐包: 源就绪门(非victim) → docker build(upgrade --missing-so-no-error + 备份恢复 + build --use-system-soname --missing-so-no-error)
            → scan → verify::decide
        ├─ Unchanged → 进 repo → index 更新(完整 needed_so)
        ├─ Repack    → repack metadata + LankeBUILD → 进 repo → index 更新

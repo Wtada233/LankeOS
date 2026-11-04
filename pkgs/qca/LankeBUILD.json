@@ -1,17 +1,17 @@
 {
   "name": "qca",
-  "version": "2.3.10",
-  "release": 3,
+  "version": "2.3.12",
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Core5Compat.so.6@Qt_6",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
-    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libcrypto.so.4@{OPENSSL_4.0.0,OPENSSL_4.1.0}",
     "libgcc_s.so.1@GCC_3.0",
     "libgcrypt.so.20@GCRYPT_1.6",
     "libnss3.so@{NSS_3.2,NSS_3.3}",
-    "libssl.so.3@OPENSSL_3.0.0",
+    "libssl.so.4@OPENSSL_4.0.0",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.15,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
@@ -28,7 +28,7 @@
     "qt6-base"
   ],
   "sources": [
-    "https://download.kde.org/Attic/qca/2.3.10/qca-2.3.10.tar.xz"
+    "https://download.kde.org/stable/qca/2.3.12/qca-2.3.12.tar.xz"
   ],
   "work_sources": []
 }

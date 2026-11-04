@@ -1,16 +1,16 @@
---- b/skia/BUILD.gn
-+++ a/skia/BUILD.gn
-@@ -884,8 +884,11 @@
+--- a/skia/BUILD.gn
++++ b/skia/BUILD.gn
+@@ -1004,8 +1004,11 @@
      cflags = [ "/arch:AVX512" ]
    } else {
      cflags = [
+-      "-march=x86-64-v4",
+-      "-mprefer-vector-width=512",
 +      "-mavx512f",
 +      "-mavx512dq",
 +      "-mavx512cd",
 +      "-mavx512bw",
 +      "-mavx512vl",
--      "-march=x86-64-v4",
--      "-mprefer-vector-width=512",
      ]
    }
  }

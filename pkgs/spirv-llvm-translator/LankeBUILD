@@ -3,13 +3,22 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
+    local root src_dir headers_dir
+    root=$(pwd)
+    src_dir=$(find "$root" -maxdepth 1 -type d -name 'SPIRV-LLVM-Translator-*' | head -n1)
+    headers_dir=$(find "$root" -maxdepth 1 -type d -name 'SPIRV-Headers-*' | head -n1)
+    [ -n "$src_dir" ] || { echo "SPIRV-LLVM-Translator source directory not found" >&2; exit 1; }
+    [ -n "$headers_dir" ] || { echo "pinned SPIRV-Headers source directory not found" >&2; exit 1; }
+
+    cd "$src_dir"
     mkdir build && cd build
     cmake -D CMAKE_INSTALL_PREFIX={PREFIX} \
     -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
           -D CMAKE_BUILD_TYPE=Release \
           -D BUILD_SHARED_LIBS=ON \
           -D CMAKE_SKIP_INSTALL_RPATH=ON \
-          -D LLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR=/usr \
+          -D LLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR="$headers_dir" \
+          -D LLVM_SPIRV_ENABLE_LIBSPIRV_DIS=ON \
           -G Ninja ..
     ninja
     DESTDIR={STAGING_ROOT} ninja install

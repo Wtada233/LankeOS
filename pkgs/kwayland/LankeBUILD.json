@@ -1,7 +1,7 @@
 {
   "name": "kwayland",
   "version": "6.8.2",
-  "release": 5,
+  "release": 6,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",

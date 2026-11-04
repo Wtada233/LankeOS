@@ -1,10 +1,19 @@
 lankebuild_prepare() {
-    :
+    # OpenSSL 4 兼容补丁（Arch 同款）
+    for patch in "{WORK_DIR}"/../*.patch; do
+        [ -f "$patch" ] || continue
+        echo "Applying patch: $patch"
+        patch -Np1 < "$patch" \
+            || patch -R --dry-run -p1 < "$patch" >/dev/null 2>&1 \
+            || exit 1
+    done
 }
 
 lankebuild_build() {
     cd src
     export WARN_CFLAGS=""
+    # Arch 同款：固定 C17，避免 GCC 16 默认 C23 与 krb5/OpenSSL 4 的兼容问题
+    export CFLAGS+=" -fPIC -fno-strict-aliasing -fstack-protector-all -std=gnu17"
 
     ./configure \
         --prefix=/usr \

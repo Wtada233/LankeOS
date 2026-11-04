@@ -1,6 +1,6 @@
 {
   "name": "libinih",
-  "version": "62",
+  "version": "63",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -20,7 +20,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/benhoyt/inih/archive/refs/tags/r62.tar.gz"
+    "https://github.com/benhoyt/inih/archive/refs/tags/r63.tar.gz"
   ],
   "work_sources": []
 }

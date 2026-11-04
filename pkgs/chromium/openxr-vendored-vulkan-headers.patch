@@ -1,6 +1,5 @@
-diff -ruN a/third_party/openxr/BUILD.gn b/third_party/openxr/BUILD.gn
---- a/third_party/openxr/BUILD.gn	2026-09-13 16:52:53.390727192 +0800
-+++ b/third_party/openxr/BUILD.gn	2026-09-13 16:52:53.416031027 +0800
+--- a/third_party/openxr/BUILD.gn
++++ b/third_party/openxr/BUILD.gn
 @@ -31,6 +31,12 @@
      ]
  

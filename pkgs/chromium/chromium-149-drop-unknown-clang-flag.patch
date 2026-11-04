@@ -1,8 +1,6 @@
-diff --git a/build/config/compiler/BUILD.gn b/build/config/compiler/BUILD.gn
-index 7df3e18c4c..1d253318a6 100644
 --- a/build/config/compiler/BUILD.gn
 +++ b/build/config/compiler/BUILD.gn
-@@ -578,7 +578,7 @@ config("compiler") {
+@@ -590,7 +590,7 @@
      cflags += [ "-fcolor-diagnostics" ]
      if (!is_wasm) {
        if (!is_win) {
@@ -11,20 +9,20 @@ index 7df3e18c4c..1d253318a6 100644
        } else {
          # Combine after https://github.com/llvm/llvm-project/pull/192241
          cflags += [ "/clang:-fdiagnostics-show-inlining-chain" ]
-@@ -1590,7 +1590,7 @@ config("clang_warning_suppression") {
+@@ -1625,7 +1625,7 @@
  # See also: https://crbug.com/40891132#comment10
  ubsan_hardening("c_array_bounds") {
    sanitizer = "array-bounds"
 -  condition = !(is_asan && target_cpu == "x86")
 +  condition = false
-
+ 
    # Because we've enabled array-bounds sanitizing we also want to suppress
    # the related warning about "unsafe-buffer-usage-in-static-sized-array",
-@@ -1604,6 +1604,7 @@ ubsan_hardening("c_array_bounds") {
+@@ -1639,6 +1639,7 @@
  # `NOTREACHED()` at the end of such functions.
  ubsan_hardening("return") {
    sanitizer = "return"
 +  condition = false
  }
-
- config("rustc_revision") {
+ 
+ # Enable `-fsanitize=unreachable` to crash deterministically if control

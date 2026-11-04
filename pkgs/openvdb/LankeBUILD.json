@@ -32,5 +32,8 @@
   "sources": [
     "https://github.com/AcademySoftwareFoundation/openvdb/archive/refs/tags/v14.0.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
 }

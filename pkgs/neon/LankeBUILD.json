@@ -1,13 +1,14 @@
 {
   "name": "neon",
   "version": "0.37.1",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.38,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
-    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libcrypto.so.4@OPENSSL_4.0.0",
     "libexpat.so.1",
-    "libssl.so.3@OPENSSL_3.0.0",
+    "libgssapi_krb5.so.2@gssapi_krb5_2_MIT",
+    "libssl.so.4@OPENSSL_4.0.0",
     "libz.so.1"
   ],
   "provides_soname": [
@@ -19,7 +20,8 @@
     "expat",
     "libxml2",
     "xmlto",
-    "zlib"
+    "zlib",
+    "krb5"
   ],
   "sources": [
     "https://github.com/notroj/neon/archive/refs/tags/0.37.1.tar.gz"

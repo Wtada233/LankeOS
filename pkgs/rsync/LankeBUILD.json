@@ -1,14 +1,14 @@
 {
   "name": "rsync",
-  "version": "3.5.1",
-  "release": 4,
+  "version": "3.5.2",
+  "release": 5,
   "deps": [
     "bash"
   ],
   "needed_so": [
     "libacl.so.1@{ACL_1.0,ACL_1.3}",
     "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8}",
-    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libcrypto.so.4@OPENSSL_4.0.0",
     "libidn2.so.0@IDN2_0.0.0",
     "liblz4.so.1",
     "libpopt.so.0@LIBPOPT_0",
@@ -28,7 +28,7 @@
     "zstd"
   ],
   "sources": [
-    "https://rsync.samba.org/ftp/rsync/src/rsync-3.5.1.tar.gz"
+    "https://rsync.samba.org/ftp/rsync/src/rsync-3.5.2.tar.gz"
   ],
   "work_sources": []
 }

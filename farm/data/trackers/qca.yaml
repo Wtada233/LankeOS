@@ -2,6 +2,6 @@ pkg-name: qca
 version-source: sources[0]
 sources:
   - tracker-template: html-index
-    url: https://download.kde.org/Attic/qca/
+    url: https://download.kde.org/stable/qca/
     pattern: href="(\d[\d.]*)/"
-    template: https://download.kde.org/Attic/qca/{version}/qca-{version}.tar.xz
+    template: https://download.kde.org/stable/qca/{version}/qca-{version}.tar.xz

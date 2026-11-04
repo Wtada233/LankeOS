@@ -1,6 +1,12 @@
 lankebuild_prepare() {
-    # Prepare environment
-    :
+    # OpenSSL 4 移除了 SSLv3_client_method；补丁让 SSLv3 分支只在 OpenSSL < 4 时编译
+    if ! patch -Np1 -i "{WORK_DIR}/../wget-1.25.0-openssl-4.patch"; then
+        if patch -R -p1 --dry-run -i "{WORK_DIR}/../wget-1.25.0-openssl-4.patch" >/dev/null 2>&1; then
+            echo "wget: 跳过已应用的 OpenSSL 4 补丁"
+        else
+            exit 1
+        fi
+    fi
 }
 
 lankebuild_build() {

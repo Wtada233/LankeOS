@@ -1,11 +1,12 @@
 {
   "name": "openimageio",
   "version": "3.2.2.0",
-  "release": 5,
+  "release": 6,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libIex-3_5.so.34",
+    "libImath-3_2.so.30",
     "libOpenColorIO.so.2.6",
     "libOpenEXR-3_5.so.34",
     "libOpenEXRCore-3_5.so.34",
@@ -23,11 +24,12 @@
     "libjxl_threads.so.0.12@JXL_0",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.43}",
     "libopenjp2.so.7",
-    "libopenjph.so.0.32",
+    "libopenjph.so.0.33",
     "libopenvdb.so.14.0",
     "libpng16.so.16@PNG16_0",
     "libpugixml.so.1",
     "libraw_r.so.25",
+    "libsharpyuv.so.0",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.15,CXXABI_1.3.2,CXXABI_1.3.3,CXXABI_1.3.5,CXXABI_1.3.7,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
     "libswscale.so.10@LIBSWSCALE_10",
     "libtbb.so.12",
@@ -71,7 +73,8 @@
     "pybind11",
     "robin-map",
     "zlib",
-    "zstd"
+    "zstd",
+    "imath"
   ],
   "sources": [
     "https://github.com/OpenImageIO/oiio/archive/refs/tags/v3.2.2.0.tar.gz"

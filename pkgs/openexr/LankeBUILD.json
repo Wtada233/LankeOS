@@ -1,7 +1,7 @@
 {
   "name": "openexr",
   "version": "3.5.3",
-  "release": 5,
+  "release": 6,
   "deps": [
     "imath"
   ],
@@ -11,7 +11,6 @@
     "libdeflate.so.0",
     "libgcc_s.so.1@GCC_3.0",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.43}",
-    "libopenjph.so.0.32",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.15,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
     "libzstd.so.1"
   ],

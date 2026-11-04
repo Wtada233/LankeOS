@@ -1,6 +1,6 @@
 {
   "name": "chromium",
-  "version": "156.0.8078.80",
+  "version": "157.0.8103.38",
   "release": 7,
   "deps": [
     "desktop-file-utils",
@@ -128,7 +128,7 @@
     "zstd"
   ],
   "sources": [
-    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-156.0.8078.80-lite.tar.xz",
+    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-157.0.8103.38-lite.tar.xz",
     "https://github.com/foutrelis/chromium-launcher/archive/v8/chromium-launcher-8.tar.gz"
   ],
   "work_sources": []

@@ -11,7 +11,6 @@ Use the same full "third_party/opus/src/include/..." style path that other
 in-tree consumers (e.g. third_party/opus/tests/opus_benchmark.cc) use, which
 resolves correctly against both the shim headers and a real bundled Opus
 checkout, since root src is always on the include path.
-
 --- a/third_party/iamf_tools/src/iamf/cli/codec/opus_decoder.cc
 +++ b/third_party/iamf_tools/src/iamf/cli/codec/opus_decoder.cc
 @@ -30,8 +30,8 @@
@@ -22,9 +21,9 @@ checkout, since root src is always on the include path.
 -#include "include/opus_types.h"
 +#include "third_party/opus/src/include/opus.h"
 +#include "third_party/opus/src/include/opus_types.h"
-
+ 
  namespace iamf_tools {
-
+ 
 --- a/third_party/iamf_tools/src/iamf/cli/codec/opus_decoder.h
 +++ b/third_party/iamf_tools/src/iamf/cli/codec/opus_decoder.h
 @@ -23,7 +23,7 @@
@@ -33,9 +32,9 @@ checkout, since root src is always on the include path.
  #include "iamf/obu/substream_channel_count.h"
 -#include "include/opus.h"
 +#include "third_party/opus/src/include/opus.h"
-
+ 
  namespace iamf_tools {
-
+ 
 --- a/third_party/iamf_tools/src/iamf/cli/codec/opus_encoder.cc
 +++ b/third_party/iamf_tools/src/iamf/cli/codec/opus_encoder.cc
 @@ -32,9 +32,9 @@
@@ -48,9 +47,9 @@ checkout, since root src is always on the include path.
 +#include "third_party/opus/src/include/opus.h"
 +#include "third_party/opus/src/include/opus_defines.h"
 +#include "third_party/opus/src/include/opus_types.h"
-
+ 
  namespace iamf_tools {
-
+ 
 --- a/third_party/iamf_tools/src/iamf/cli/codec/opus_encoder.h
 +++ b/third_party/iamf_tools/src/iamf/cli/codec/opus_encoder.h
 @@ -22,8 +22,8 @@
@@ -61,16 +60,17 @@ checkout, since root src is always on the include path.
 -#include "include/opus_defines.h"
 +#include "third_party/opus/src/include/opus.h"
 +#include "third_party/opus/src/include/opus_defines.h"
-
+ 
  namespace iamf_tools {
-
+ 
 --- a/third_party/iamf_tools/src/iamf/cli/codec/opus_utils.cc
 +++ b/third_party/iamf_tools/src/iamf/cli/codec/opus_utils.cc
-@@ -3,7 +3,7 @@
+@@ -14,7 +14,7 @@
  #include "absl/status/status.h"
  #include "absl/strings/str_cat.h"
  #include "absl/strings/string_view.h"
 -#include "include/opus_defines.h"
 +#include "third_party/opus/src/include/opus_defines.h"
-
+ 
  namespace iamf_tools {
+ 

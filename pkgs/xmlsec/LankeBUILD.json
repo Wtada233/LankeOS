@@ -1,11 +1,11 @@
 {
   "name": "xmlsec",
   "version": "1.3.13",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.43,GLIBC_ABI_DT_RELR}",
-    "libcrypto.so.3@{OPENSSL_3.0.0,OPENSSL_3.3.0,OPENSSL_3.4.0}",
+    "libcrypto.so.4@{OPENSSL_4.0.0,OPENSSL_4.1.0}",
     "libgnutls.so.30@{GNUTLS_3_4,GNUTLS_3_6_0,GNUTLS_3_6_13,GNUTLS_3_8_2,GNUTLS_3_8_4}",
     "libltdl.so.7",
     "libnspr4.so",

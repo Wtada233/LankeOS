@@ -1,6 +1,6 @@
 {
   "name": "python-pip",
-  "version": "26.2.2",
+  "version": "26.3",
   "release": 3,
   "deps": [
     "python"
@@ -15,7 +15,7 @@
     "python-pyproject-hooks"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/fa/e8/0842d757e483e895e670f655084cfe8b8c72580c6769a76b30b2789a0608/pip-26.2.2.tar.gz"
+    "https://files.pythonhosted.org/packages/53/c7/f8d9e2e0e7c1ed8a22a10eeb3b5bf7860bc07d8446c7a978a882c5c8214b/pip-26.3.tar.gz"
   ],
   "work_sources": []
 }

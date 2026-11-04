@@ -26,7 +26,8 @@
     "meson",
     "ninja",
     "vulkan-headers",
-    "vulkan-loader"
+    "vulkan-loader",
+    "libunwind"
   ],
   "sources": [
     "git+https://github.com/haasn/libplacebo@v7.387.0"

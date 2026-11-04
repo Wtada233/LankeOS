@@ -1,7 +1,7 @@
 {
   "name": "rust",
   "version": "1.99.1",
-  "release": 6,
+  "release": 7,
   "deps": [
     "bash",
     "lld"
@@ -16,11 +16,11 @@
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.43}",
     "libsqlite3.so.0",
     "libssh2.so.1",
-    "libssl.so.3@OPENSSL_3.0.0",
+    "libssl.so.4@OPENSSL_4.0.0",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.21,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
-    "librustc_driver-453464c3ebd2f748.so"
+    "librustc_driver-67e7c3ca03ce77f7.so"
   ],
   "build_deps": [
     "base-devel",
