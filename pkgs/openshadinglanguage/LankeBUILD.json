@@ -1,6 +1,6 @@
 {
   "name": "openshadinglanguage",
-  "version": "1.15.7.0",
+  "version": "1.15.8.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -46,7 +46,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/AcademySoftwareFoundation/OpenShadingLanguage/archive/refs/tags/v1.15.7.0.tar.gz"
+    "https://github.com/AcademySoftwareFoundation/OpenShadingLanguage/archive/refs/tags/v1.15.8.0.tar.gz"
   ],
   "work_sources": []
 }

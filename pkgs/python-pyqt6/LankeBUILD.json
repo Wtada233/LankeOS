@@ -1,7 +1,7 @@
 {
   "name": "python-pyqt6",
-  "version": "6.11.0",
-  "release": 7,
+  "version": "6.12.0",
+  "release": 8,
   "deps": [
     "python",
     "python-pyqt6-sip"
@@ -13,7 +13,7 @@
     "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Designer.so.6@Qt_6",
-    "libQt6Gui.so.6@Qt_6",
+    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
     "libQt6Help.so.6@Qt_6",
     "libQt6Multimedia.so.6@Qt_6",
     "libQt6MultimediaWidgets.so.6@Qt_6",
@@ -39,7 +39,8 @@
     "libgcc_s.so.1@GCC_3.0",
     "libm.so.6@{GLIBC_2.35,GLIBC_2.38,GLIBC_2.43}",
     "libpython3.15.so.1.0",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.20}"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.20}",
+    "libxkbcommon.so.0"
   ],
   "provides_soname": [],
   "build_deps": [
@@ -60,7 +61,7 @@
     "libglvnd"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/8b/47/b25c13eca5bebc6505394d0223e46d7ebf0c57dcac2ed908d7d19b18ab6b/pyqt6-6.11.0.tar.gz"
+    "https://files.pythonhosted.org/packages/8b/77/73ae0fd2ce7915ce87269743fd11f14f009b8db60a58759afc1c402327f2/pyqt6-6.12.0.tar.gz"
   ],
   "work_sources": []
 }

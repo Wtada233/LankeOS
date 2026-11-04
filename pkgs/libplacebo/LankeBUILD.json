@@ -1,6 +1,6 @@
 {
   "name": "libplacebo",
-  "version": "7.360.1",
+  "version": "7.387.0",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -9,13 +9,14 @@
     "libglslang-default-resource-limits.so.16",
     "libglslang.so.16",
     "liblcms2.so.2",
-    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.43}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.43}",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.15,GLIBCXX_3.4.29}",
+    "libunwind.so.8",
     "libvulkan.so.1"
   ],
   "provides_soname": [
     "libplacebo.so",
-    "libplacebo.so.360"
+    "libplacebo.so.387"
   ],
   "build_deps": [
     "base-devel",
@@ -28,6 +29,7 @@
     "vulkan-loader"
   ],
   "sources": [
-    "git+https://github.com/haasn/libplacebo@v7.360.1"
-  ]
+    "git+https://github.com/haasn/libplacebo@v7.387.0"
+  ],
+  "work_sources": []
 }

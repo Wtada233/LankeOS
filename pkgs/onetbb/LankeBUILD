@@ -1,10 +1,13 @@
 lankebuild_prepare() {
+    # TCM 硬加 -D_FORTIFY_SOURCE=2，与发行版 CXXFLAGS 的 =3 重定义；
+    # 关掉 TCM 的 -Werror，只留警告。
     cmake -B build -G Ninja -S . \
         -DCMAKE_INSTALL_PREFIX={PREFIX} \
         -DCMAKE_INSTALL_LIBDIR=lib \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=ON \
         -DTBB_STRICT=OFF \
+        -DTCM_STRICT=OFF \
         -DTBB_TEST=OFF \
         -DTBB4PY_BUILD=OFF
 }

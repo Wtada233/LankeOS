@@ -1,6 +1,6 @@
 {
   "name": "kmod",
-  "version": "34.2",
+  "version": "34.3",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -23,7 +23,7 @@
     "zstd"
   ],
   "sources": [
-    "https://www.kernel.org/pub/linux/utils/kernel/kmod/kmod-34.2.tar.xz"
+    "https://www.kernel.org/pub/linux/utils/kernel/kmod/kmod-34.3.tar.xz"
   ],
   "work_sources": []
 }

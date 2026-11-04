@@ -8,8 +8,35 @@ lankebuild_prepare() {
         fi
     fi
 
-    # USD 26.11 把 pxr/imaging/glf/drawTarget.h 移到了 hdSt/，Blender 5.2.3 的
-    # Hydra 仍 include 旧路径；关掉 Hydra，USD 导入/导出不受影响。
+    if ! patch -Np1 -i "{WORK_DIR}/../openvdb-14.patch"; then
+        if patch -R -p1 --dry-run -i "{WORK_DIR}/../openvdb-14.patch" >/dev/null 2>&1; then
+            echo "OpenVDB 14 兼容补丁已应用，跳过"
+        else
+            echo "OpenVDB 14 兼容补丁应用失败" >&2
+            exit 1
+        fi
+    fi
+
+    if ! patch -Np1 -i "{WORK_DIR}/../blender-tbb-const-comparator.patch"; then
+        if patch -R -p1 --dry-run -i "{WORK_DIR}/../blender-tbb-const-comparator.patch" >/dev/null 2>&1; then
+            echo "oneTBB 比较器补丁已应用，跳过"
+        else
+            echo "oneTBB 比较器补丁应用失败" >&2
+            exit 1
+        fi
+    fi
+
+    if ! patch -Np1 -i "{WORK_DIR}/../blender-usd-26.11.patch"; then
+        if patch -R -p1 --dry-run -i "{WORK_DIR}/../blender-usd-26.11.patch" >/dev/null 2>&1; then
+            echo "USD 26.11 兼容补丁已应用，跳过"
+        else
+            echo "USD 26.11 兼容补丁应用失败" >&2
+            exit 1
+        fi
+    fi
+
+    # USD 26.11 移走了旧的 pxr/imaging/glf/drawTarget.h；Arch 的补丁删掉
+    # Hydra viewport_engine 里多余的 include，Hydra 保持启用。
     cmake -B build -G Ninja -S . \
         -C build_files/cmake/config/blender_release.cmake \
         -D CMAKE_BUILD_TYPE=Release \
@@ -22,7 +49,6 @@ lankebuild_prepare() {
         -D WITH_PYTHON_INSTALL=OFF \
         -D PYTHON_VERSION=3.15 \
         -D USD_ROOT_DIR=/usr \
-        -D WITH_HYDRA=OFF \
         -D WITH_SYSTEM_GFLAGS=ON \
         -D WITH_SYSTEM_GLOG=ON \
         -D WITH_CYCLES_DEVICE_CUDA=OFF \

@@ -1,15 +1,15 @@
 {
   "name": "xmlsec",
-  "version": "1.3.12",
+  "version": "1.3.13",
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.43,GLIBC_ABI_DT_RELR}",
     "libcrypto.so.3@{OPENSSL_3.0.0,OPENSSL_3.3.0,OPENSSL_3.4.0}",
     "libgnutls.so.30@{GNUTLS_3_4,GNUTLS_3_6_0,GNUTLS_3_6_13,GNUTLS_3_8_2,GNUTLS_3_8_4}",
     "libltdl.so.7",
     "libnspr4.so",
-    "libnss3.so@{NSS_3.10,NSS_3.11.2,NSS_3.12,NSS_3.12.3,NSS_3.13,NSS_3.15,NSS_3.2,NSS_3.3,NSS_3.34,NSS_3.4,NSS_3.58,NSS_3.59,NSS_3.6,NSS_3.7,NSS_3.8,NSS_3.9}",
+    "libnss3.so@{NSS_3.10,NSS_3.12,NSS_3.12.3,NSS_3.13,NSS_3.15,NSS_3.2,NSS_3.3,NSS_3.34,NSS_3.4,NSS_3.58,NSS_3.59,NSS_3.6,NSS_3.7,NSS_3.8,NSS_3.9}",
     "libnssutil3.so@{NSSUTIL_3.12,NSSUTIL_3.12.3}",
     "libsmime3.so@{NSS_3.10,NSS_3.2,NSS_3.4}",
     "libxml2.so.16",
@@ -17,13 +17,13 @@
   ],
   "provides_soname": [
     "libxmlsec1-gnutls.so",
-    "libxmlsec1-gnutls.so.10312",
+    "libxmlsec1-gnutls.so.10313",
     "libxmlsec1-nss.so",
-    "libxmlsec1-nss.so.10312",
+    "libxmlsec1-nss.so.10313",
     "libxmlsec1-openssl.so",
-    "libxmlsec1-openssl.so.10312",
+    "libxmlsec1-openssl.so.10313",
     "libxmlsec1.so",
-    "libxmlsec1.so.10312"
+    "libxmlsec1.so.10313"
   ],
   "build_deps": [
     "base-devel",
@@ -34,7 +34,7 @@
     "nspr"
   ],
   "sources": [
-    "https://github.com/lsh123/xmlsec/releases/download/1.3.12/xmlsec1-1.3.12.tar.gz"
+    "https://github.com/lsh123/xmlsec/releases/download/1.3.13/xmlsec1-1.3.13.tar.gz"
   ],
   "work_sources": []
 }

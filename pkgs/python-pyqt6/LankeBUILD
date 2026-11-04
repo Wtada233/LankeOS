@@ -12,11 +12,13 @@ lankebuild_build() {
     # qt6-base 只装 qmake6（无 qmake），sip-install 默认找 qmake → 显式指 --qmake
     # --confirm-license 自动接受 Qt license 提示（不传会卡死循环，Arch 同款）
     # --no-make 只生成 Makefile；qt6-base 只装 qmake6 → 显式 --qmake
-    CXXFLAGS+=" -std=c++17"
+    # sip-build 不把环境 CXXFLAGS 写进 qmake 生成的 Makefile；GCC 16 默认
+    # C++20，而 Qt 6.12 的 QLocale 比较需要 C++17 的 operator!=。
     sip-build \
         --confirm-license \
         --no-make \
         --qmake={BINDIR}/qmake6 \
+        --qmake-setting "QMAKE_CXXFLAGS += -std=c++17" \
         --pep484-pyi
     cd build
     make -j$(nproc)

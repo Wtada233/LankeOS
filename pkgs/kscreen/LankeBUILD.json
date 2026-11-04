@@ -1,6 +1,6 @@
 {
   "name": "kscreen",
-  "version": "6.8.1",
+  "version": "6.8.2",
   "release": 5,
   "deps": [],
   "needed_so": [
@@ -59,7 +59,7 @@
     "wayland-protocols"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.1/kscreen-6.8.1.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.2/kscreen-6.8.2.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "ostree",
-  "version": "2026.5",
+  "version": "2026.6",
   "release": 5,
   "deps": [],
   "needed_so": [
@@ -43,7 +43,7 @@
     "zlib"
   ],
   "sources": [
-    "git+https://github.com/ostreedev/ostree@v2026.5"
+    "git+https://github.com/ostreedev/ostree@v2026.6"
   ],
   "work_sources": []
 }

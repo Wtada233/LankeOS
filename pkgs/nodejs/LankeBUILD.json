@@ -1,6 +1,6 @@
 {
   "name": "nodejs",
-  "version": "26.12.1",
+  "version": "26.13.0",
   "release": 6,
   "deps": [
     "bash",
@@ -36,7 +36,7 @@
     "zstd"
   ],
   "sources": [
-    "https://nodejs.org/dist/v26.12.1/node-v26.12.1.tar.xz"
+    "https://nodejs.org/dist/v26.13.0/node-v26.13.0.tar.xz"
   ],
   "work_sources": []
 }

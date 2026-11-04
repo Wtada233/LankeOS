@@ -1,6 +1,6 @@
 {
   "name": "noto-fonts",
-  "version": "2026.10.01",
+  "version": "2026.11.01",
   "release": 1,
   "deps": [],
   "needed_so": [],
@@ -13,17 +13,17 @@
   ],
   "sources": [],
   "work_sources": [
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf",
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSans/hinted/ttf/NotoSans-Bold.ttf",
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSans/hinted/ttf/NotoSans-Italic.ttf",
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSans/hinted/ttf/NotoSans-BoldItalic.ttf",
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSerif/hinted/ttf/NotoSerif-Regular.ttf",
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSerif/hinted/ttf/NotoSerif-Bold.ttf",
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSerif/hinted/ttf/NotoSerif-Italic.ttf",
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSerif/hinted/ttf/NotoSerif-BoldItalic.ttf",
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSansMono/hinted/ttf/NotoSansMono-Regular.ttf",
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSansMono/hinted/ttf/NotoSansMono-Bold.ttf",
-    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.10.01/fonts/NotoSansSymbols2/hinted/ttf/NotoSansSymbols2-Regular.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSans/hinted/ttf/NotoSans-Bold.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSans/hinted/ttf/NotoSans-Italic.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSans/hinted/ttf/NotoSans-BoldItalic.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSerif/hinted/ttf/NotoSerif-Regular.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSerif/hinted/ttf/NotoSerif-Bold.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSerif/hinted/ttf/NotoSerif-Italic.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSerif/hinted/ttf/NotoSerif-BoldItalic.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSansMono/hinted/ttf/NotoSansMono-Regular.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSansMono/hinted/ttf/NotoSansMono-Bold.ttf",
+    "https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.11.01/fonts/NotoSansSymbols2/hinted/ttf/NotoSansSymbols2-Regular.ttf",
     "https://raw.githubusercontent.com/notofonts/noto-fonts/main/LICENSE"
   ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "wireplumber",
-  "version": "0.5.18",
+  "version": "0.5.19",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -32,7 +32,7 @@
     "python-lxml"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/0.5.18/wireplumber-0.5.18.tar.gz"
+    "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/0.5.19/wireplumber-0.5.19.tar.gz"
   ],
   "work_sources": []
 }

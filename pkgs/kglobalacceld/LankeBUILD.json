@@ -1,6 +1,6 @@
 {
   "name": "kglobalacceld",
-  "version": "6.8.1",
+  "version": "6.8.2",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -40,7 +40,7 @@
     "xcb-util-keysyms"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.1/kglobalacceld-6.8.1.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.2/kglobalacceld-6.8.2.tar.xz"
   ],
   "work_sources": []
 }

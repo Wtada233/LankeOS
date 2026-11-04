@@ -1,7 +1,7 @@
 {
   "name": "gn",
-  "version": "20261022.93808782",
-  "release": 2,
+  "version": "20261029.ed7fee04",
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
@@ -15,7 +15,7 @@
     "ninja"
   ],
   "sources": [
-    "https://gn.googlesource.com/gn/+archive/938087829fcbcc8fd87835ee301dd522c7637685.tar.gz"
+    "https://gn.googlesource.com/gn/+archive/ed7fee04cb30b96ed40ef188acfad5417349e399.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

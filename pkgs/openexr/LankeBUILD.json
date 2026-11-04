@@ -1,6 +1,6 @@
 {
   "name": "openexr",
-  "version": "3.5.2",
+  "version": "3.5.3",
   "release": 5,
   "deps": [
     "imath"
@@ -43,7 +43,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/openexr/openexr/archive/refs/tags/v3.5.2.tar.gz"
+    "https://github.com/openexr/openexr/archive/refs/tags/v3.5.3.tar.gz"
   ],
   "work_sources": []
 }

@@ -10,5 +10,20 @@ lankebuild_build() {
 lankebuild_package() {
     mkdir -p {STAGING_ROOT}/usr/include/stb
     install -m644 *.h -t {STAGING_ROOT}/usr/include/stb/
+
+    # 新版把 stb_image_resize2.h / stb_sprintf.h 等移进了 deprecated/；
+    # 消费者仍按 <stb/...> 引用，一并安装以保持兼容。
+    # 顶层与 deprecated/ 出现同名头文件时不能静默覆盖：那说明上游改了布局，
+    # 需要人工确认该装哪个版本。
+    local hdr name
+    for hdr in deprecated/*.h; do
+        name=$(basename "$hdr")
+        if [ -e "$name" ]; then
+            echo "stb: deprecated/$name 与顶层 $name 同名，拒绝覆盖" >&2
+            exit 1
+        fi
+    done
+    install -m644 deprecated/*.h -t {STAGING_ROOT}/usr/include/stb/
+
     install -Dm644 LICENSE -t {STAGING_ROOT}/usr/share/licenses/stb/
 }

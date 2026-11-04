@@ -1,0 +1,10 @@
+--- a/source/blender/render/hydra/viewport_engine.cc	2026-10-26 12:57:57.150074795 +0000
++++ b/source/blender/render/hydra/viewport_engine.cc	2026-10-26 12:57:57.152074814 +0000
+@@ -6,7 +6,6 @@
+ #include "camera.hh"
+ 
+ #include <pxr/base/gf/camera.h>
+-#include <pxr/imaging/glf/drawTarget.h>
+ #include <pxr/usd/usdGeom/camera.h>
+ 
+ #include "DNA_camera_types.h"

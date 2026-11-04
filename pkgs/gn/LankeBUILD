@@ -8,6 +8,11 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
+    # 上游 gen.py 未设置 CXX 时会用 cipd 拉 hermetic clang/sysroot；
+    # 显式指定系统 clang 走同一分支，避免构建容器里没有 cipd。
+    export CC=clang
+    export CXX=clang++
+
     # 生成 ninja 构建文件（--no-static-libstdc++：LankeOS 无 libstdc++.a）
     python3 build/gen.py --no-static-libstdc++
 

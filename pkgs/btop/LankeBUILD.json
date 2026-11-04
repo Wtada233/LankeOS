@@ -1,6 +1,6 @@
 {
   "name": "btop",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -14,6 +14,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://github.com/aristocratos/btop/archive/refs/tags/v1.4.7.tar.gz"
-  ]
+    "https://github.com/aristocratos/btop/archive/refs/tags/v1.4.8.tar.gz"
+  ],
+  "work_sources": []
 }

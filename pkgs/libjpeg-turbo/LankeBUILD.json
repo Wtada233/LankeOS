@@ -1,6 +1,6 @@
 {
   "name": "libjpeg-turbo",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -21,7 +21,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.2.0.tar.gz"
+    "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.2.1.tar.gz"
   ],
   "work_sources": []
 }

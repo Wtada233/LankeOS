@@ -1,6 +1,6 @@
 {
   "name": "pipewire",
-  "version": "1.6.10",
+  "version": "1.6.11",
   "release": 5,
   "deps": [
     "bash"
@@ -61,7 +61,7 @@
     "sbc"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.10/pipewire-1.6.10.tar.gz"
+    "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.11/pipewire-1.6.11.tar.gz"
   ],
   "work_sources": []
 }

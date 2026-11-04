@@ -1,6 +1,6 @@
 {
   "name": "simdutf",
-  "version": "9.3.2",
+  "version": "9.3.3",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -17,7 +17,7 @@
     "cmake"
   ],
   "sources": [
-    "https://github.com/simdutf/simdutf/archive/refs/tags/v9.3.2/simdutf-9.3.2.tar.gz"
+    "https://github.com/simdutf/simdutf/archive/refs/tags/v9.3.3/simdutf-9.3.3.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "kirigami-addons",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "release": 6,
   "deps": [
     "qt6-multimedia",
@@ -22,6 +22,7 @@
     "libKF6GuiAddons.so.6",
     "libKF6I18n.so.6",
     "libKF6IconThemes.so.6",
+    "libKirigamiPlatform.so.6",
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Qml.so.6@{Qt_6,Qt_6_PRIVATE_API}",
@@ -62,7 +63,7 @@
     "qt6-multimedia"
   ],
   "sources": [
-    "https://download.kde.org/stable/kirigami-addons/kirigami-addons-1.15.0.tar.xz"
+    "https://download.kde.org/stable/kirigami-addons/kirigami-addons-1.16.0.tar.xz"
   ],
   "work_sources": []
 }

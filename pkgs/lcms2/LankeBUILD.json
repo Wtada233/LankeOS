@@ -1,6 +1,6 @@
 {
   "name": "lcms2",
-  "version": "2.19.1",
+  "version": "2.20",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -20,7 +20,8 @@
     "zlib"
   ],
   "sources": [
-    "https://downloads.sourceforge.net/lcms/lcms2-2.19.1.tar.gz"
+    "https://downloads.sourceforge.net/lcms/lcms2-2.20.tar.gz"
   ],
-  "no_strip": false
+  "no_strip": false,
+  "work_sources": []
 }

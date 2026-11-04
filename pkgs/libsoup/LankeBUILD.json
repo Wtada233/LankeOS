@@ -1,6 +1,6 @@
 {
   "name": "libsoup",
-  "version": "3.8.0",
+  "version": "3.8.1",
   "release": 4,
   "deps": [],
   "needed_so": [
@@ -8,6 +8,7 @@
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
+    "libgssapi_krb5.so.2@gssapi_krb5_2_MIT",
     "libnghttp2.so.14",
     "libpsl.so.5",
     "libsqlite3.so.0",
@@ -32,7 +33,7 @@
     "zstd"
   ],
   "sources": [
-    "https://download.gnome.org/sources/libsoup/3.8/libsoup-3.8.0.tar.xz"
+    "https://download.gnome.org/sources/libsoup/3.8/libsoup-3.8.1.tar.xz"
   ],
   "no_strip": false,
   "work_sources": []

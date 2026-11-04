@@ -1,6 +1,6 @@
 {
   "name": "wayland-protocols",
-  "version": "1.49",
+  "version": "1.50",
   "release": 3,
   "deps": [],
   "needed_so": [],
@@ -12,7 +12,7 @@
     "wayland"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/archive/1.49/wayland-protocols-1.49.tar.gz"
+    "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/archive/1.50/wayland-protocols-1.50.tar.gz"
   ],
   "work_sources": []
 }

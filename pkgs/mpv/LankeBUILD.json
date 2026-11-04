@@ -1,7 +1,7 @@
 {
   "name": "mpv",
   "version": "0.41.0",
-  "release": 10,
+  "release": 11,
   "deps": [
     "ffnvcodec-headers",
     "wayland-protocols",
@@ -33,7 +33,7 @@
     "liblcms2.so.2",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29}",
     "libpipewire-0.3.so.0",
-    "libplacebo.so.360",
+    "libplacebo.so.387",
     "libpulse.so.0@PULSE_0",
     "libswresample.so.7@LIBSWRESAMPLE_7",
     "libswscale.so.10@LIBSWSCALE_10",

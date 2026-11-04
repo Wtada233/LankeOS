@@ -1,6 +1,6 @@
 {
   "name": "plasma-integration",
-  "version": "6.8.1",
+  "version": "6.8.2",
   "release": 6,
   "deps": [
     "kf-qqc2-desktop-style",
@@ -66,7 +66,7 @@
     "wayland"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.1/plasma-integration-6.8.1.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.2/plasma-integration-6.8.2.tar.xz"
   ],
   "work_sources": []
 }

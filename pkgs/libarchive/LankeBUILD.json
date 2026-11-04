@@ -1,6 +1,6 @@
 {
   "name": "libarchive",
-  "version": "3.8.10",
+  "version": "3.8.11",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -29,7 +29,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/libarchive/libarchive/releases/download/v3.8.10/libarchive-3.8.10.tar.xz"
+    "https://github.com/libarchive/libarchive/releases/download/v3.8.11/libarchive-3.8.11.tar.xz"
   ],
   "work_sources": []
 }
