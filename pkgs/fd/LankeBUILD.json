@@ -1,6 +1,6 @@
 {
   "name": "fd",
-  "version": "10.5.0",
+  "version": "10.5.1",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -14,7 +14,7 @@
     "rust"
   ],
   "sources": [
-    "https://github.com/sharkdp/fd/archive/refs/tags/v10.5.0.tar.gz"
+    "https://github.com/sharkdp/fd/archive/refs/tags/v10.5.1.tar.gz"
   ],
   "work_sources": []
 }
