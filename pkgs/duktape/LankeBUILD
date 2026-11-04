@@ -1,6 +1,9 @@
 lankebuild_prepare() {
-    # Prepare environment
-    :
+    # Arch 同款修复：上游 Makefile.sharedlibrary 链接时没带 -lm，而 duktape 的数学内建
+    # 引用 log2/log10/pow。--as-needed 下必须把 -lm 放在源文件之后，否则 libduktape
+    # 没有 DT_NEEDED libm，polkitd 这类不直接链 libm 的消费者运行期会报
+    # "undefined symbol: log2"。
+    sed -i 's/duktape\.c/& -lm/' Makefile.sharedlibrary
 }
 
 lankebuild_build() {
