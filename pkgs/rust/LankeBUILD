@@ -39,7 +39,7 @@ lankebuild_build() {
 [build]
 description = "LankeOS Rust {ORIG_PKG_VER}"
 vendor = true
-target = ["x86_64-unknown-linux-gnu"]
+target = ["x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
 cargo = "/usr/bin/cargo"
 rustc = "/usr/bin/rustc"
 rustfmt = "/usr/bin/rustfmt"
@@ -68,6 +68,12 @@ codegen-units-std = 1
 [target.x86_64-unknown-linux-gnu]
 llvm-config = "{BINDIR}/llvm-config"
 optimized-compiler-builtins = "$clangdir/lib/linux/libclang_rt.builtins-x86_64.a"
+
+# musl 目标：live/init 等静态工具用。musl-root 由 musl 包提供。
+[target.x86_64-unknown-linux-musl]
+musl-root = "/usr/lib/musl"
+cc = "musl-gcc"
+sanitizers = false
 
 [install]
 prefix = "/usr"

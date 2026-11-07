@@ -5,20 +5,55 @@ if [ "$EUID" -ne 0 ]; then
 fi
 set -e
 
-chown -R root:root *
-pushd initramfs
-rm -rf ../ISO/boot/initrd.img
-touch ../ISO/boot/initrd.img
-chmod 777 ../ISO/boot/initrd.img
-find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB > ../ISO/boot/initrd.img
-chmod 644 ../ISO/boot/initrd.img
-popd
+cd "$(dirname "$0")"
+ROOT=$(pwd)
+KRNL=$ROOT/../../../tools/krnl
+
+die() { echo "pack.sh: $*" >&2; [ -n "${WORK:-}" ] && rm -rf "$WORK"; exit 1; }
+
+###############################################################################
+# 前置检查：Rust init / 内核 / rootfs.sfs 缺一不可
+###############################################################################
+command -v cargo >/dev/null 2>&1 || die "找不到 cargo"
+
+WORK=$(mktemp -d)
+INIT_TARGET=x86_64-unknown-linux-musl
+cargo build --release --locked --target "$INIT_TARGET" \
+    --manifest-path init/Cargo.toml --target-dir "$WORK/cargo" \
+    || die "构建 Rust init 失败（需要 rust 包提供 $INIT_TARGET std）"
+INIT_BIN=$WORK/cargo/$INIT_TARGET/release/lanke-init
+[ -x "$INIT_BIN" ] || die "找不到 init 可执行文件：$INIT_BIN"
+
+for f in vmlinuz-lanke System.map-lanke config-lanke; do
+    [ -f "$KRNL/$f" ] || die "找不到内核文件：$KRNL/$f"
+done
+[ -f ISO/live/rootfs.sfs ] || die "找不到 ISO/live/rootfs.sfs（先 gensquashfs 生成）"
+
+###############################################################################
+# initramfs：把 Rust init 放进树里直接打包（initramfs/init 已 gitignore）
+###############################################################################
+install -m755 "$INIT_BIN" initramfs/init
+chown -R root:root initramfs
+rm -rf "$WORK"
+
+rm -rf ISO/boot/initrd.img
+if command -v cpio >/dev/null 2>&1; then
+    ( cd initramfs && find . | cpio -o -H newc ) \
+        | xz --check=crc32 --lzma2=dict=1MiB > ISO/boot/initrd.img
+elif command -v bsdtar >/dev/null 2>&1; then
+    bsdtar --format newc -C initramfs -cf - . \
+        | xz --check=crc32 --lzma2=dict=1MiB > ISO/boot/initrd.img
+else
+    die "需要 cpio 或 bsdtar 来打包 initramfs"
+fi
+chmod 644 ISO/boot/initrd.img
+
 pushd ISO/live/
 #rm -rf rootfs.sfs
 #gensquashfs -D /mnt/lfs/ -c xz -b 1M -X dictsize=1M,level=9,x86,extreme -f rootfs.sfs
 popd
 pushd ISO/boot/
-cp -a ../../../../../tools/krnl/{config-lanke,System.map-lanke,vmlinuz-lanke} ./
+cp -a "$KRNL"/{config-lanke,System.map-lanke,vmlinuz-lanke} ./
 popd
 
 # ============================================================
@@ -178,4 +213,6 @@ rm -f ISO/live/rootfs.sfs ISO/boot/initrd.img ISO/boot/{config-lanke,System.map-
 #              -serial stdio \
 #              -net nic -net user \
 #              -bios /usr/share/OVMF/x64/OVMF.4m.fd
-chown -R "$SUDO_USER:$(id -g "$SUDO_USER")" *
+if [ -n "${SUDO_USER:-}" ]; then
+    chown -R "$SUDO_USER:$(id -g "$SUDO_USER")" ISO initramfs
+fi

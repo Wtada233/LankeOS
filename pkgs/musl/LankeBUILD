@@ -1,0 +1,40 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # rust 的 musl target 默认 -static-pie，静态 libc.a 必须是 PIC；
+    # 否则 ld.lld 报 R_X86_64_32/32S "recompile with -fPIC"。
+    # Rust CI 的 musl-toolchain.sh 同样全局加 -fPIC。
+    export CFLAGS="$CFLAGS -fPIC"
+
+    # 与 Arch 一致：头文件/静态库在 /usr/lib/musl，musl-gcc 包装器在 /usr/bin。
+    # --enable-wrapper=all 让 configure 生成 musl-gcc。
+    ./configure \
+        --prefix=/usr/lib/musl \
+        --exec-prefix=/usr \
+        --enable-wrapper=all
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+
+    # musl-gcc 同时提供带 triplet 的名字（rust 的 musl 目标按这个名字调用）
+    ln -sf ./musl-gcc {STAGING_ROOT}{BINDIR}/x86_64-linux-musl-gcc
+
+    # syslibdir 默认 /lib。合并 /usr 的系统里 staging 的 lib -> usr/lib，
+    # install 已经落到 {LIBDIR}；只有 lib 是真实目录时才需要挪。
+    for f in {STAGING_ROOT}/lib/ld-musl*.so*; do
+        [ -e "$f" ] || continue
+        dest="{STAGING_ROOT}{LIBDIR}/$(basename "$f")"
+        if [ "$f" -ef "$dest" ]; then
+            continue
+        fi
+        mv "$f" "$dest"
+    done
+    rmdir --ignore-fail-on-non-empty {STAGING_ROOT}/lib 2>/dev/null || true
+
+    install -Dm644 {SRC_DIR}/README {STAGING_ROOT}{DATADIR}/doc/musl/README
+    install -Dm644 {SRC_DIR}/COPYRIGHT {STAGING_ROOT}{DATADIR}/licenses/musl/COPYRIGHT
+}

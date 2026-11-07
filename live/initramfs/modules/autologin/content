@@ -1,3 +1,0 @@
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin LankeOS --noclear %I $TERM

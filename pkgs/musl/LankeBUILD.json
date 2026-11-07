@@ -1,0 +1,20 @@
+{
+  "name": "musl",
+  "version": "1.2.6",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [
+    "ld-musl-x86_64.so.1"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://www.musl-libc.org/releases/musl-1.2.6.tar.gz"
+  ],
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
+}

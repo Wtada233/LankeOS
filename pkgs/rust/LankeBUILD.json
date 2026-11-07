@@ -1,7 +1,7 @@
 {
   "name": "rust",
   "version": "1.99.1",
-  "release": 7,
+  "release": 9,
   "deps": [
     "bash",
     "lld"
@@ -32,6 +32,7 @@
     "libgit2",
     "libssh2",
     "llvm",
+    "musl",
     "ninja",
     "rust",
     "sqlite",
