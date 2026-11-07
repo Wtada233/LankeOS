@@ -1,0 +1,7 @@
+pkg-name: musl
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://musl.libc.org/releases.html
+    pattern: 'href="releases/musl-([0-9.]+)\.tar\.gz"'
+    template: https://www.musl-libc.org/releases/musl-{version}.tar.gz
