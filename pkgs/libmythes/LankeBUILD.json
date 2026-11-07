@@ -1,10 +1,10 @@
 {
   "name": "libmythes",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libgcc_s.so.1@GCC_3.0",
     "libm.so.6",
     "libstdc++.so.6@{CXXABI_1.3,GLIBCXX_3.4,GLIBCXX_3.4.30}"
@@ -18,7 +18,7 @@
     "hunspell"
   ],
   "sources": [
-    "https://github.com/hunspell/mythes/releases/download/v1.2.6/mythes-1.2.6.tar.xz"
+    "https://github.com/hunspell/mythes/releases/download/v1.2.7/mythes-1.2.7.tar.xz"
   ],
   "work_sources": []
 }

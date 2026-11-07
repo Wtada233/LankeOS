@@ -4,7 +4,10 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    make BUILD_STATIC=no PREFIX=/usr -j$(nproc)
+    # 1.11.0 的 lib/Makefile 里 `lib` 目标无条件依赖 liblz4.a，但 BUILD_STATIC=no 会把
+    # static_library 规则整个跳过 → "No rule to make target 'liblz4.a'"。构建时保持
+    # 默认（静态库照编，只有几个对象，代价可忽略），只在 install 时禁用，产物仍不含 .a。
+    make PREFIX=/usr -j$(nproc)
     make BUILD_STATIC=no PREFIX=/usr DESTDIR={STAGING_ROOT} install
     # 添加兼容性链接
     ln -sfv lz4 {STAGING_ROOT}{BINDIR}/lz4c

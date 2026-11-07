@@ -6,9 +6,16 @@ lankebuild_build() {
     # facebl0r/facedetect 需要 opencv2/xobjdetect.hpp（opencv-contrib 模块，仓库 opencv 未装）→ 关掉
     # rgbparade/vectorscope/scale0tilt 依赖 gavl（仓库无此包）→ 关掉
     # Arch 因 OpenCV 5 为此打了 opencv-5.patch；跳过这两个插件后无需补丁
+    #
+    # 3.7.0 的 test bundle-symbol-probe 把 OBJECT library bundle-prototype-registry
+    # 直接塞进 SHARED library，但只给 bundle-prototype-addition 设了
+    # POSITION_INDEPENDENT_CODE ON（上游 master 仍未修），非 PIC 对象链接 .so 会报
+    # "relocation R_X86_64_32S ... recompile with -fPIC"。测试不安装、farm 也不跑 ctest，
+    # 直接不构建测试。
     cmake -B build -G Ninja \
         -DCMAKE_INSTALL_PREFIX={PREFIX} \
         -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_TESTING=OFF \
         -DWITHOUT_OPENCV=ON \
         -DWITHOUT_GAVL=ON
     ninja -C build -j$(nproc)

@@ -1,6 +1,6 @@
 {
   "name": "poppler",
-  "version": "26.10.0",
+  "version": "26.11.0",
   "release": 3,
   "deps": [
     "poppler-data"
@@ -42,8 +42,8 @@
     "libpoppler-glib.so.8",
     "libpoppler-qt6.so",
     "libpoppler-qt6.so.3",
-    "libpoppler.so.165@POPPLER_165",
-    "libpoppler.so@POPPLER_165"
+    "libpoppler.so.166@POPPLER_166",
+    "libpoppler.so@POPPLER_166"
   ],
   "build_deps": [
     "base-devel",
@@ -72,7 +72,7 @@
     "zlib"
   ],
   "sources": [
-    "https://poppler.freedesktop.org/poppler-26.10.0.tar.xz"
+    "https://poppler.freedesktop.org/poppler-26.11.0.tar.xz"
   ],
   "work_sources": []
 }

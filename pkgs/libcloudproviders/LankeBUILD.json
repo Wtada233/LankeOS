@@ -1,6 +1,6 @@
 {
   "name": "libcloudproviders",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -23,7 +23,7 @@
     "vala"
   ],
   "sources": [
-    "https://download.gnome.org/sources/libcloudproviders/0.4/libcloudproviders-0.4.1.tar.xz"
+    "https://download.gnome.org/sources/libcloudproviders/0.4/libcloudproviders-0.4.2.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "stb",
-  "version": "20261101",
+  "version": "20261106",
   "release": 3,
   "deps": [],
   "needed_so": [],
@@ -9,7 +9,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://github.com/nothings/stb/archive/d14d46f6b44456eb88beac58cba833a4135d4c89.tar.gz"
+    "https://github.com/nothings/stb/archive/8e2e85e5574aacda369c9faa558e9ebde73d8c98.tar.gz"
   ],
   "work_sources": []
 }

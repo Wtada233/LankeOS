@@ -1,7 +1,7 @@
 {
   "name": "libreoffice",
   "version": "26.8.2.2",
-  "release": 13,
+  "release": 14,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -89,7 +89,7 @@
     "libpangocairo-1.0.so.0",
     "libplc4.so",
     "libpng16.so.16@PNG16_0",
-    "libpoppler.so.165@POPPLER_165",
+    "libpoppler.so.166@POPPLER_166",
     "libpq.so.5",
     "libpython3.15.so.1.0",
     "libqxp-0.0.so.0",

@@ -1,6 +1,6 @@
 {
   "name": "ark",
-  "version": "26.08.2",
+  "version": "26.08.3",
   "release": 2,
   "deps": [
     "unzip",
@@ -70,7 +70,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.kde.org/stable/release-service/26.08.2/src/ark-26.08.2.tar.xz"
+    "https://download.kde.org/stable/release-service/26.08.3/src/ark-26.08.3.tar.xz"
   ],
   "work_sources": []
 }

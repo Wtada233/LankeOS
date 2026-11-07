@@ -8,23 +8,9 @@
 # 源码上游仍叫 ibus（libibus 只是 Arch 拆包名），source 用 ibus release tarball。
 
 lankebuild_prepare() {
-    # 上游修复 (ibus#2889)：IBusText.attrs 拿到的是**浮动**引用却被直接赋值，没走
-    # ibus_text_set_attributes()（内含 g_object_ref_sink）。GNOME 51 的 inputMethod.js
-    # 同时新增了 set_preedit_format(HINT) 和 get_attributes()：前者让 libibus 走到
-    # ibus_input_context_convert_text() 这条有 bug 的路径，后者让 gjs 去 sink 那个
-    # 浮动引用 —— 于是 attrs 被 IBusText 和 gjs wrapper 双重持有，一方减引用就悬垂，
-    # ibus_text_destroy 里 unref 已释放对象 → SIGSEGV。
-    # 修复提交 5bbe88a193（2026-05-27），首发 1.5.35-alpha1；1.5.34 之后没有新的稳定版。
-    # 容错：patch -N 对"已应用"返回 1，用 reverse-dry-run 判别 —— 将来上游纳入后自动 no-op。
-    _p=ibus-2889-attrlist-floating-ref.patch
-    if patch -Np1 --dry-run -i "{WORK_DIR}/../$_p" >/dev/null 2>&1; then
-        patch -Np1 -i "{WORK_DIR}/../$_p"
-    elif patch -R -p1 --dry-run -i "{WORK_DIR}/../$_p" >/dev/null 2>&1; then
-        echo "$_p 已应用，跳过"
-    else
-        echo "$_p 应用失败" >&2
-        exit 1
-    fi
+    # 1.5.35 已包含 ibus#2889 的修复（转换后的 attrs 走 ibus_text_set_attributes），
+    # 不再需要 1.5.34 时期的 backport 补丁。
+    :
 }
 
 lankebuild_build() {

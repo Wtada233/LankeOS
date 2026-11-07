@@ -1,6 +1,6 @@
 {
   "name": "mpv",
-  "version": "0.41.0",
+  "version": "0.42.0",
   "release": 11,
   "deps": [
     "ffnvcodec-headers",
@@ -24,7 +24,8 @@
     "libavfilter.so.12@LIBAVFILTER_12",
     "libavformat.so.63@LIBAVFORMAT_63",
     "libavutil.so.61@LIBAVUTIL_61",
-    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.11,GLIBC_2.14,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "libcurl.so.4",
     "libdisplay-info.so.3",
     "libdrm.so.2",
     "libgbm.so.1",
@@ -55,6 +56,7 @@
   "build_deps": [
     "alsa-lib",
     "base-devel",
+    "curl",
     "ffmpeg",
     "ffnvcodec-headers",
     "git",
@@ -87,6 +89,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz"
-  ]
+    "https://github.com/mpv-player/mpv/archive/refs/tags/v0.42.0.tar.gz"
+  ],
+  "work_sources": []
 }

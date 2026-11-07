@@ -1,6 +1,6 @@
 {
   "name": "zlib",
-  "version": "1.3.2",
+  "version": "1.4",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -14,7 +14,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz"
+    "https://github.com/madler/zlib/releases/download/v1.4/zlib-1.4.tar.gz"
   ],
   "work_sources": []
 }

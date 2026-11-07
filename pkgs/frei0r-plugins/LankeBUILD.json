@@ -1,6 +1,6 @@
 {
   "name": "frei0r-plugins",
-  "version": "3.6.0",
+  "version": "3.7.0",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -11,7 +11,7 @@
     "libcairo.so.2",
     "libgcc_s.so.1@GCC_3.0",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43}",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.2,CXXABI_1.3.3,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.2,CXXABI_1.3.3,CXXABI_1.3.7,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [],
   "build_deps": [
@@ -22,7 +22,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/dyne/frei0r/archive/refs/tags/v3.6.0.tar.gz"
+    "https://github.com/dyne/frei0r/archive/refs/tags/v3.7.0.tar.gz"
   ],
   "work_sources": []
 }

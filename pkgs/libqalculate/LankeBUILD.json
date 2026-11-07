@@ -1,6 +1,6 @@
 {
   "name": "libqalculate",
-  "version": "5.13.1",
+  "version": "5.13.2",
   "release": 5,
   "deps": [],
   "needed_so": [
@@ -33,7 +33,7 @@
     "readline"
   ],
   "sources": [
-    "https://github.com/Qalculate/libqalculate/releases/download/v5.13.1/libqalculate-5.13.1.tar.gz"
+    "https://github.com/Qalculate/libqalculate/releases/download/v5.13.2/libqalculate-5.13.2.tar.gz"
   ],
   "work_sources": []
 }

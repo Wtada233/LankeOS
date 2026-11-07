@@ -1,6 +1,6 @@
 {
   "name": "signon-kwallet-extension",
-  "version": "26.08.2",
+  "version": "26.08.3",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -22,7 +22,7 @@
     "signond"
   ],
   "sources": [
-    "https://download.kde.org/stable/release-service/26.08.2/src/signon-kwallet-extension-26.08.2.tar.xz"
+    "https://download.kde.org/stable/release-service/26.08.3/src/signon-kwallet-extension-26.08.3.tar.xz"
   ],
   "work_sources": []
 }
