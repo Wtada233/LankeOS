@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 pub type R<T> = Result<T, String>;
 
 fn cpath(p: &Path) -> R<CString> {
-    CString::new(p.as_os_str().as_bytes()).map_err(|_| format!("path contains NUL: {}", p.display()))
+    CString::new(p.as_os_str().as_bytes())
+        .map_err(|_| format!("path contains NUL: {}", p.display()))
 }
 
 fn cstr(s: &str) -> R<CString> {
@@ -82,8 +83,7 @@ pub fn bind_mount(src: &Path, target: &Path) -> R<()> {
 }
 
 pub fn mkdir_p(path: &Path) -> R<()> {
-    std::fs::create_dir_all(path)
-        .map_err(|e| format!("mkdir {}: {e}", path.display()))
+    std::fs::create_dir_all(path).map_err(|e| format!("mkdir {}: {e}", path.display()))
 }
 
 pub fn symlink_force(target: &Path, link: &Path) -> R<()> {
@@ -126,7 +126,11 @@ pub fn chroot(path: &Path) -> R<()> {
     let path_c = cpath(path)?;
     let rc = unsafe { libc::chroot(path_c.as_ptr()) };
     if rc < 0 {
-        Err(format!("chroot {}: {}", path.display(), io::Error::last_os_error()))
+        Err(format!(
+            "chroot {}: {}",
+            path.display(),
+            io::Error::last_os_error()
+        ))
     } else {
         Ok(())
     }
@@ -140,7 +144,11 @@ pub fn exec(path: &Path) -> R<()> {
     let path_c = cpath(path)?;
     let argv = [path_c.as_ptr(), std::ptr::null()];
     unsafe { libc::execv(path_c.as_ptr(), argv.as_ptr()) };
-    Err(format!("exec {}: {}", path.display(), io::Error::last_os_error()))
+    Err(format!(
+        "exec {}: {}",
+        path.display(),
+        io::Error::last_os_error()
+    ))
 }
 
 pub fn open(path: &Path, flags: libc::c_int) -> io::Result<libc::c_int> {
@@ -160,7 +168,11 @@ pub fn close(fd: libc::c_int) {
     }
 }
 
-pub fn ioctl(fd: libc::c_int, request: libc::c_ulong, arg: libc::c_ulong) -> io::Result<libc::c_int> {
+pub fn ioctl(
+    fd: libc::c_int,
+    request: libc::c_ulong,
+    arg: libc::c_ulong,
+) -> io::Result<libc::c_int> {
     // glibc 的 ioctl request 是 c_ulong，musl 是 c_int。
     let rc = unsafe { libc::ioctl(fd, request as libc::Ioctl, arg) };
     if rc < 0 {

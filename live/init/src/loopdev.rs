@@ -34,10 +34,13 @@ struct LoopInfo64 {
 /// 返回设备路径和 loop 设备的 fd：调用方必须在挂载完成后再 close，
 /// 否则 autoclear 会在挂载前把 loop 清掉（读到 EIO）。
 pub fn setup_ro(backing: &Path) -> sys::R<(PathBuf, libc::c_int)> {
-    let ctl = sys::open(Path::new("/dev/loop-control"), libc::O_RDWR | libc::O_CLOEXEC)
-        .map_err(|e| format!("open /dev/loop-control: {e}"))?;
-    let idx = sys::ioctl(ctl, LOOP_CTL_GET_FREE, 0)
-        .map_err(|e| format!("LOOP_CTL_GET_FREE: {e}"))?;
+    let ctl = sys::open(
+        Path::new("/dev/loop-control"),
+        libc::O_RDWR | libc::O_CLOEXEC,
+    )
+    .map_err(|e| format!("open /dev/loop-control: {e}"))?;
+    let idx =
+        sys::ioctl(ctl, LOOP_CTL_GET_FREE, 0).map_err(|e| format!("LOOP_CTL_GET_FREE: {e}"))?;
     sys::close(ctl);
     if idx < 0 {
         return Err("LOOP_CTL_GET_FREE returned negative index".into());

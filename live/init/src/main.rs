@@ -322,7 +322,13 @@ fn switch_root() -> R<()> {
     println!("Transitioning to LankeOS...");
 
     sys::chdir(Path::new("/newroot"))?;
-    sys::mount(Some(Path::new(".")), Path::new("/"), None, libc::MS_MOVE, None)?;
+    sys::mount(
+        Some(Path::new(".")),
+        Path::new("/"),
+        None,
+        libc::MS_MOVE,
+        None,
+    )?;
     sys::chroot(Path::new("."))?;
     sys::chdir(Path::new("/"))?;
     sys::exec(Path::new(target))

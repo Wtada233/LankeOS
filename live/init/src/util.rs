@@ -67,7 +67,8 @@ pub fn detect_shell(passwd: &Path) -> &'static str {
 
 /// 把 shadow 里 root 的密码字段清空（live 默认无密码）。
 pub fn clear_root_password(path: &Path) -> R<()> {
-    let data = std::fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+    let data =
+        std::fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
     let mut out = String::with_capacity(data.len());
     for line in data.split_inclusive('\n') {
         if line.starts_with("root:") {
@@ -99,12 +100,7 @@ pub fn shell_quote(s: &str) -> String {
 }
 
 /// 复刻 modules/inject 的 echo 模式：把内容逐行变成 echo '<line>' 追加到目标。
-pub fn append_echo_lines(
-    path: &Path,
-    content: &str,
-    guard: Option<&str>,
-    fish: bool,
-) -> R<()> {
+pub fn append_echo_lines(path: &Path, content: &str, guard: Option<&str>, fish: bool) -> R<()> {
     let mut out = String::new();
     if let Some(guard) = guard {
         if fish {
@@ -141,7 +137,11 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("lanke-init-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let shadow = dir.join("shadow");
-        std::fs::write(&shadow, "root:$6$abc:19000:0:99999:7:::\nLankeOS:x:1:1:::\n").unwrap();
+        std::fs::write(
+            &shadow,
+            "root:$6$abc:19000:0:99999:7:::\nLankeOS:x:1:1:::\n",
+        )
+        .unwrap();
         clear_root_password(&shadow).unwrap();
         let got = std::fs::read_to_string(&shadow).unwrap();
         assert_eq!(got, "root::19000:0:99999:7:::\nLankeOS:x:1:1:::\n");
@@ -153,9 +153,17 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("lanke-init-passwd-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let passwd = dir.join("passwd");
-        std::fs::write(&passwd, "LankeOS:x:1000:1000::/home/LankeOS:/usr/bin/fish\n").unwrap();
+        std::fs::write(
+            &passwd,
+            "LankeOS:x:1000:1000::/home/LankeOS:/usr/bin/fish\n",
+        )
+        .unwrap();
         assert_eq!(detect_shell(&passwd), "fish");
-        std::fs::write(&passwd, "LankeOS:x:1000:1000::/home/LankeOS:/usr/bin/bash\n").unwrap();
+        std::fs::write(
+            &passwd,
+            "LankeOS:x:1000:1000::/home/LankeOS:/usr/bin/bash\n",
+        )
+        .unwrap();
         assert_eq!(detect_shell(&passwd), "bash");
         std::fs::remove_dir_all(&dir).unwrap();
     }

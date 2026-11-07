@@ -13,7 +13,11 @@ pub fn autologin(root: &Path) -> R<()> {
         "etc/systemd/system/getty@tty1.service.d/autologin.conf",
         "etc/systemd/system/serial-getty@ttyS0.service.d/autologin.conf",
     ] {
-        sys::write_file(&sys::root_join(root, rel), assets::AUTOLOGIN.as_bytes(), None)?;
+        sys::write_file(
+            &sys::root_join(root, rel),
+            assets::AUTOLOGIN.as_bytes(),
+            None,
+        )?;
     }
     Ok(())
 }

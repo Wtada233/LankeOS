@@ -47,10 +47,7 @@ fn read_label(dev: &Path) -> io::Result<Option<String>> {
     // ISO9660：主卷描述符在 32768，卷标 32 字节 @ 40
     let mut pvd = [0u8; 2048];
     f.seek(SeekFrom::Start(32768))?;
-    if f.read_exact(&mut pvd).is_ok()
-        && pvd[0] == 0x01
-        && &pvd[1..6] == b"CD001"
-    {
+    if f.read_exact(&mut pvd).is_ok() && pvd[0] == 0x01 && &pvd[1..6] == b"CD001" {
         return Ok(Some(trim_label(&pvd[40..72])));
     }
 
