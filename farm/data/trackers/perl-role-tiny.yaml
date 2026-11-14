@@ -1,0 +1,7 @@
+pkg-name: perl-role-tiny
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://cpan.metacpan.org/authors/id/H/HA/HAARG/
+    pattern: Role-Tiny-(\d[\d.]*)\.tar\.gz
+    template: https://cpan.metacpan.org/authors/id/H/HA/HAARG/Role-Tiny-{version}.tar.gz

@@ -1,0 +1,20 @@
+{
+  "name": "python-smartypants",
+  "version": "2.0.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/6c/8f/a033f78196d9467b402d100ec40b95166d43fa2642693f23f771473d8195/smartypants-2.0.2.tar.gz"
+  ],
+  "work_sources": []
+}

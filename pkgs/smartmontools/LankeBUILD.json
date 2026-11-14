@@ -1,0 +1,24 @@
+{
+  "name": "smartmontools",
+  "version": "7.5",
+  "release": 1,
+  "deps": [
+    "bash"
+  ],
+  "needed_so": [
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7}",
+    "libcap-ng.so.0",
+    "libgcc_s.so.1@GCC_3.0",
+    "libstdc++.so.6@{CXXABI_1.3,GLIBCXX_3.4,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.30}",
+    "libsystemd.so.0@LIBSYSTEMD_209"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "libcap-ng"
+  ],
+  "sources": [
+    "https://downloads.sourceforge.net/project/smartmontools/smartmontools/7.5/smartmontools-7.5.tar.gz"
+  ],
+  "work_sources": []
+}

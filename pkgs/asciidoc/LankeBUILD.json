@@ -1,0 +1,20 @@
+{
+  "name": "asciidoc",
+  "version": "10.2.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/1d/e7/315a82f2d256e9270977aa3c15e8fe281fd7c40b8e2a0b97e0cb61ca8fa0/asciidoc-10.2.1.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -11,8 +11,8 @@ lankebuild_build() {
                    -Dtests=disabled     \
                    -Dexamples=disabled  \
                    -Dintrospection=enabled \
-                   -Dnls=disabled       \
-                   -Dtools=disabled
+                   -Dnls=enabled       \
+                   -Dtools=enabled
     echo "Building gstreamer-{ORIG_PKG_VER}"
     ninja -j$(nproc)
     echo "Build complete."

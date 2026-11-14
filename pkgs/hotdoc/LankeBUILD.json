@@ -1,0 +1,51 @@
+{
+  "name": "hotdoc",
+  "version": "0.18.3",
+  "release": 1,
+  "deps": [
+    "python-appdirs",
+    "python-dbus-deviation",
+    "python-feedgen",
+    "python-lxml",
+    "python-networkx",
+    "python-pkgconfig",
+    "python-pyyaml",
+    "python-schema",
+    "python-toposort",
+    "python-wheezy-template"
+  ],
+  "needed_so": [
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
+    "libglib-2.0.so.0",
+    "libjson-glib-1.0.so.0@libjson-glib-1.0.so.0",
+    "libxml2.so.16"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "git",
+    "meson",
+    "meson-python",
+    "ninja",
+    "nodejs",
+    "python",
+    "python-appdirs",
+    "python-build",
+    "python-dbus-deviation",
+    "python-feedgen",
+    "python-installer",
+    "python-lxml",
+    "python-networkx",
+    "python-pkgconfig",
+    "python-pyyaml",
+    "python-schema",
+    "python-toposort",
+    "python-wheel",
+    "python-wheezy-template"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/a2/e8/799c34a47c3512899299113d55d928a5ee3d25649774c80946e97b53a7ba/hotdoc-0.18.3.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -5,7 +5,6 @@ lankebuild_prepare() {
         --sysconfdir=/usr/share \
         --with-json \
         --with-cli=readline \
-        --disable-python \
         --disable-debug
 }
 
@@ -16,5 +15,8 @@ lankebuild_build() {
 
 lankebuild_package() {
     make DESTDIR="{STAGING_ROOT}" install
+    (cd py && python3 setup.py install --root="{STAGING_ROOT}" --prefix=/usr \
+        --single-version-externally-managed --record=/dev/null)
+    find "{STAGING_ROOT}" -name __pycache__ -type d -exec rm -rf {} +
     install -Dm644 /dev/null "{STAGING_ROOT}/etc/nftables.conf"
 }

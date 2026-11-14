@@ -8,7 +8,7 @@ lankebuild_build() {
         --prefix={PREFIX} \
         --libexecdir=lib \
         -Dmanpage=disabled \
-        -Dbashcomp=disabled \
+        -Dbashcomp=enabled \
         -Dgtk_doc=false \
         -Dtests=false
     meson compile -C build

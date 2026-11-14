@@ -1,0 +1,17 @@
+{
+  "name": "perl-regexp-common",
+  "version": "2024080801",
+  "release": 1,
+  "deps": [
+    "perl"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://cpan.metacpan.org/authors/id/A/AB/ABIGAIL/Regexp-Common-2024080801.tar.gz"
+  ],
+  "work_sources": []
+}

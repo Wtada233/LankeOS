@@ -1,0 +1,22 @@
+{
+  "name": "python-dbus-deviation",
+  "version": "0.6.1",
+  "release": 1,
+  "deps": [
+    "python-lxml"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/01/dc/047feaa6a81545e10c37d4eeff86443c90dd114c5ce13d6937c5ed38854d/dbus-deviation-0.6.1.tar.gz"
+  ],
+  "work_sources": []
+}

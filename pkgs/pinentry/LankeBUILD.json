@@ -1,20 +1,32 @@
 {
   "name": "pinentry",
   "version": "1.3.3",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6Widgets.so.6@Qt_6",
     "libassuan.so.9@LIBASSUAN_2.0",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4}",
+    "libgcc_s.so.1@GCC_3.0",
+    "libgcr-base-3.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
     "libgpg-error.so.0@GPG_ERROR_1.0",
-    "libncursesw.so.6"
+    "libncursesw.so.6",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}"
   ],
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "gcr",
+    "gtk3",
     "libassuan",
+    "libgpg-error",
     "ncurses",
-    "libgpg-error"
+    "qt6-base"
   ],
   "sources": [
     "https://www.gnupg.org/ftp/gcrypt/pinentry/pinentry-1.3.3.tar.bz2"

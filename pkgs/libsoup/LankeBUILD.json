@@ -1,10 +1,11 @@
 {
   "name": "libsoup",
   "version": "3.8.1",
-  "release": 4,
+  "release": 5,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libbrotlidec.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.6,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
@@ -21,18 +22,20 @@
   ],
   "build_deps": [
     "base-devel",
+    "brotli",
     "glib",
     "glib-networking",
     "gobject-introspection",
+    "krb5",
     "libpsl",
     "meson",
     "nghttp2",
     "ninja",
     "sqlite",
+    "sysprof",
+    "vala",
     "zlib",
-    "zstd",
-    "krb5",
-    "vala"
+    "zstd"
   ],
   "sources": [
     "https://download.gnome.org/sources/libsoup/3.8/libsoup-3.8.1.tar.xz"

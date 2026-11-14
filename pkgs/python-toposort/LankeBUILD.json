@@ -1,0 +1,20 @@
+{
+  "name": "python-toposort",
+  "version": "1.10",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/69/19/8e955d90985ecbd3b9adb2a759753a6840da2dff3c569d412b2c9217678b/toposort-1.10.tar.gz"
+  ],
+  "work_sources": []
+}

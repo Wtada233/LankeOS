@@ -1,0 +1,8 @@
+pkg-name: perl-cloc
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: AlDanial/cloc
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

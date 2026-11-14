@@ -16,7 +16,7 @@ lankebuild_build() {
 
     # 对齐 Arch python 打包参数：启用 LTO / computed-gotos / dbm(gdbm) / ipv6 / tzpath。
     # pip 拆独立包（python-pip），禁用 ensurepip（Arch 同款）；未开 --with-system-libmpdec（仓库暂无 mpdecimal 包）。
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --enable-shared --with-system-expat --with-system-ffi --enable-optimizations --with-lto --with-computed-gotos --with-dbmliborder=gdbm:ndbm --enable-ipv6 --enable-loadable-sqlite-extensions --without-static-libpython --with-tzpath=/usr/share/zoneinfo --without-ensurepip
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --enable-shared --with-system-expat --enable-optimizations --with-lto --with-computed-gotos --with-dbmliborder=gdbm:ndbm --enable-ipv6 --enable-loadable-sqlite-extensions --without-static-libpython --with-tzpath=/usr/share/zoneinfo --without-ensurepip
     make -j$(nproc) EXTRA_CFLAGS="$CFLAGS"
     make DESTDIR={STAGING_ROOT} install
 

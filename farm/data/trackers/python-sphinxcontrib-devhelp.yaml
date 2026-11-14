@@ -1,0 +1,5 @@
+pkg-name: python-sphinxcontrib-devhelp
+version-source: sources[0]
+sources:
+  - tracker-template: pypi
+    project: sphinxcontrib-devhelp

@@ -1,0 +1,7 @@
+pkg-name: perl-class-method-modifiers
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://cpan.metacpan.org/authors/id/E/ET/ETHER/
+    pattern: Class-Method-Modifiers-(\d[\d.]*)\.tar\.gz
+    template: https://cpan.metacpan.org/authors/id/E/ET/ETHER/Class-Method-Modifiers-{version}.tar.gz

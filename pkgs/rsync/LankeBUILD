@@ -9,7 +9,7 @@ lankebuild_build() {
       --prefix={PREFIX} \
       --enable-ipv6 \
       --disable-debug \
-      --disable-xxhash \
+      --enable-xxhash \
       --with-included-popt=no \
       --with-included-zlib=no
     make -j$(nproc)

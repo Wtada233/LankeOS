@@ -3,7 +3,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} -Ddocs-build=false -Dlibdbus=auto -Dpython=disabled .
+    meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} -Ddocs-build=false -Dlibdbus=auto -Dpython=enabled .
     ninja -C build -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja -C build install
 }

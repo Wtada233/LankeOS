@@ -1,0 +1,20 @@
+{
+  "name": "python-snowballstemmer",
+  "version": "3.1.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/43/f8/0a71edf031f03c40db17503cb8ca78a69a171254e568e7db241b0ab57ea1/snowballstemmer-3.1.1.tar.gz"
+  ],
+  "work_sources": []
+}

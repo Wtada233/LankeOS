@@ -12,7 +12,7 @@ lankebuild_build() {
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
         --enable-shared \
         --disable-static \
-        --disable-fortran \
+        --enable-fortran \
         --enable-threads \
         --enable-sse2 \
         --enable-avx2
@@ -25,7 +25,7 @@ lankebuild_build() {
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
         --enable-shared \
         --disable-static \
-        --disable-fortran \
+        --enable-fortran \
         --enable-threads \
         --enable-sse \
         --enable-sse2 \

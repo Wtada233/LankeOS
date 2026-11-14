@@ -1,0 +1,7 @@
+pkg-name: help2man
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://ftp.gnu.org/gnu/help2man/
+    pattern: help2man-([0-9.]+)\.tar\.xz
+    template: https://ftp.gnu.org/gnu/help2man/help2man-{version}.tar.xz

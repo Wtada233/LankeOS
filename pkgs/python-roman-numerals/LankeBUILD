@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 上游声明 flit_core<4；直接用已安装的 flit_core 构建纯 Python wheel
+    mkdir -p dist
+    python3 -c "import flit_core.buildapi as b; b.build_wheel('dist')"
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find "{STAGING_ROOT}" -name __pycache__ -type d -exec rm -rf {} +
+}

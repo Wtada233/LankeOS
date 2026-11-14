@@ -1,0 +1,10 @@
+pkg-name: squashfs-tools
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: plougher/squashfs-tools
+    mode: tags
+    tag-prefix: ""
+    # 上游混着旧命名法的 `squashfs-tools-*` tag 与非版本 tag
+    exclude: "^(squashfs-tools-|CVE-)"
+    template: https://github.com/{repo}/archive/{tag}/squashfs-tools-{version}.tar.gz

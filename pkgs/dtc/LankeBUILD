@@ -1,5 +1,6 @@
 lankebuild_prepare() {
-    :
+    # 上游 libfdt.i 仍用 Python 2 C API 的手写 typemap；换成 Python 3 等价物
+    patch -Np1 -i "{WORK_DIR}/../fix-python3-typemaps.patch"
 }
 
 lankebuild_build() {
@@ -7,7 +8,7 @@ lankebuild_build() {
         --prefix={PREFIX} \
         --buildtype=release \
         -Ddefault_library=shared \
-        -Dpython=disabled \
+        -Dpython=enabled \
         -Dvalgrind=disabled \
         -Dtests=false
     ninja -C build

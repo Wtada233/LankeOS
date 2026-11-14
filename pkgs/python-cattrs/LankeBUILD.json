@@ -1,7 +1,7 @@
 {
   "name": "python-cattrs",
   "version": "26.2.1",
-  "release": 1,
+  "release": 2,
   "deps": [
     "python",
     "python-attrs",

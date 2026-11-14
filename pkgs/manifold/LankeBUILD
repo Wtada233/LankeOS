@@ -4,7 +4,7 @@ lankebuild_prepare() {
         -DCMAKE_INSTALL_LIBDIR=lib \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=ON \
-        -DMANIFOLD_PYBIND=OFF \
+        -DMANIFOLD_PYBIND=ON \
         -DMANIFOLD_PAR=ON \
         -DMANIFOLD_TEST=OFF
 }

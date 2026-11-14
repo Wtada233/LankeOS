@@ -1,0 +1,21 @@
+{
+  "name": "python-shtab",
+  "version": "1.13.0",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-setuptools-scm",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/ff/dd/e58588cf2d02266d504f4399979740b8b2b61fbd7719a89578afaa6558a3/shtab-1.13.0.tar.gz"
+  ],
+  "work_sources": []
+}

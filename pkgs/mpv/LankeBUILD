@@ -8,7 +8,7 @@ lankebuild_build() {
         --buildtype=release \
         -Ddefault_library=shared \
         -Dlibmpv=true \
-        -Dlua=disabled \
+        -Dlua=luajit \
         -Djpeg=enabled \
         -Dx11=enabled \
         -Dwayland=enabled \

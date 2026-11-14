@@ -7,14 +7,14 @@ lankebuild_build() {
     mkdir -p build && cd build
     ../configure \
         --prefix={PREFIX} \
-        --disable-nls \
+        --enable-nls \
         --enable-tui \
         --enable-targets=all \
         --with-system-readline \
         --with-python={PREFIX}/bin/python \
         --with-system-gdbinit={SYSCONFDIR}/gdb/gdbinit \
         --without-guile \
-        --without-source-highlight
+        --disable-source-highlight
     make -j$(nproc)
     make -C gdb/data-directory DESTDIR={STAGING_ROOT} install
     make -C gdb DESTDIR={STAGING_ROOT} install

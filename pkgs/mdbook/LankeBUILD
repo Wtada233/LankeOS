@@ -1,0 +1,11 @@
+lankebuild_prepare() {
+    cargo fetch --locked
+}
+
+lankebuild_build() {
+    cargo build --release --locked
+}
+
+lankebuild_package() {
+    install -Dm755 target/release/mdbook "{STAGING_ROOT}{BINDIR}/mdbook"
+}

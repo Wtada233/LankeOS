@@ -3,7 +3,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-python 
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

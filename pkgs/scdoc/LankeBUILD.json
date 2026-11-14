@@ -1,0 +1,17 @@
+{
+  "name": "scdoc",
+  "version": "1.11.5",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34}"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://git.sr.ht/~sircmpwn/scdoc/archive/1.11.5.tar.gz"
+  ],
+  "work_sources": []
+}

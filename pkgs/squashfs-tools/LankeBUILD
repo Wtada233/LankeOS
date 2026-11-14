@@ -1,0 +1,39 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 只启用仓库里已打包的压缩后端；LZO 未打包。
+    # 用预生成 man 页，避免构建期引入 help2man。
+    make -C squashfs-tools \
+        GZIP_SUPPORT=1 \
+        LZ4_SUPPORT=1 \
+        LZO_SUPPORT=0 \
+        XATTR_SUPPORT=1 \
+        XZ_SUPPORT=1 \
+        ZSTD_SUPPORT=1 \
+        USE_PREBUILT_MANPAGES=y \
+        -j$(nproc)
+
+    # install 目标也会重算依赖列表，压缩后端开关必须原样再传一遍；
+    # 否则会按默认值去拉未打包的 lzo 头文件
+    make -C squashfs-tools \
+        GZIP_SUPPORT=1 \
+        LZ4_SUPPORT=1 \
+        LZO_SUPPORT=0 \
+        XATTR_SUPPORT=1 \
+        XZ_SUPPORT=1 \
+        ZSTD_SUPPORT=1 \
+        USE_PREBUILT_MANPAGES=y \
+        INSTALL_PREFIX="{STAGING_ROOT}{PREFIX}" \
+        INSTALL_MANPAGES_DIR="{STAGING_ROOT}{DATADIR}/man/man1" \
+        install
+
+    install -Dm644 COPYING "{STAGING_ROOT}{DATADIR}/licenses/squashfs-tools/COPYING"
+    install -d "{STAGING_ROOT}{DATADIR}/doc/squashfs-tools"
+    cp -a Documentation/[0-9]*/. "{STAGING_ROOT}{DATADIR}/doc/squashfs-tools/"
+}
+
+lankebuild_package() {
+    :
+}

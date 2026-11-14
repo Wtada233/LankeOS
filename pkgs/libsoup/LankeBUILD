@@ -9,8 +9,8 @@ lankebuild_build() {
                    --buildtype=release  \
                    -Ddocs=disabled      \
                    -Dtests=false        \
-                   -Dsysprof=disabled   \
-                   -Dbrotli=disabled
+                   -Dsysprof=enabled   \
+                   -Dbrotli=enabled
     echo "Building libsoup-{ORIG_PKG_VER}"
     ninja -j$(nproc)
     echo "Build complete."

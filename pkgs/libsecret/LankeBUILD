@@ -10,7 +10,7 @@ lankebuild_build() {
                    -Dgtk_doc=false      \
                    -Dmanpage=false      \
                    -Dintrospection=true \
-                   -Dvapi=false         \
+                   -Dvapi=true         \
                    -Dcrypto=gnutls
     echo "Building libsecret-{ORIG_PKG_VER}"
     ninja -j$(nproc)

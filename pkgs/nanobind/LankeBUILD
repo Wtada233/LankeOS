@@ -1,0 +1,19 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 上游 install rules 就是按 Python 包布局装到 nanobind/ 下；
+    # 直接用它自己的 CMake 从 sdist 构建，不走预编译 wheel。
+    _sp="$(python3 -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
+    cmake -B build -S . -G Ninja \
+        -DCMAKE_INSTALL_PREFIX="$_sp" \
+        -DNB_TEST=OFF \
+        -DNB_MASTER_PROJECT=ON \
+        -DNB_CREATE_INSTALL_RULES=ON
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" cmake --install build
+    find "{STAGING_ROOT}" -name __pycache__ -type d -exec rm -rf {} +
+}

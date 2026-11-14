@@ -26,8 +26,6 @@ lankebuild_build() {
         --disable-appindicator \
         --disable-dconf \
         --disable-systemd-services \
-        --disable-python2 \
-        --disable-python-library \
         --disable-setup \
         --disable-ui \
         --disable-engine \

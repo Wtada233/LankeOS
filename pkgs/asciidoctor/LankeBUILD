@@ -1,0 +1,12 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    gem build asciidoctor.gemspec
+}
+
+lankebuild_package() {
+    _gemdir="$(ruby -e 'print Gem.default_dir')"
+    gem install --local --no-document         --install-dir "{STAGING_ROOT}${_gemdir}"         --bindir "{STAGING_ROOT}{BINDIR}" asciidoctor-*.gem
+}

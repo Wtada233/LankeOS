@@ -5,7 +5,7 @@ lankebuild_prepare() {
         -DCMAKE_BUILD_TYPE=Release \
         -DALSOFT_ENABLE_MODULES=OFF \
         -DBUILD_SHARED_LIBS=ON \
-        -DALSOFT_UTILS=OFF \
+        -DALSOFT_UTILS=ON \
         -DALSOFT_EXAMPLES=OFF \
         -DALSOFT_TESTS=OFF \
         -DALSOFT_BACKEND_ALSA=ON \
@@ -15,7 +15,6 @@ lankebuild_prepare() {
         -DALSOFT_BACKEND_SDL2=OFF \
         -DALSOFT_BACKEND_SDL3=OFF \
         -DALSOFT_BACKEND_JACK=OFF \
-        -DALSOFT_BACKEND_FLUIDSYNTH=OFF \
         -DALSOFT_BACKEND_WAVE=ON
 }
 

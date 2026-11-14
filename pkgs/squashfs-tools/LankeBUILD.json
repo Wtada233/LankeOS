@@ -1,0 +1,27 @@
+{
+  "name": "squashfs-tools",
+  "version": "4.7.5",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "liblz4.so.1",
+    "liblzma.so.5@XZ_5.0",
+    "libm.so.6@GLIBC_2.2.5",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "lz4",
+    "xz",
+    "zlib",
+    "zstd"
+  ],
+  "sources": [
+    "https://github.com/plougher/squashfs-tools/archive/4.7.5/squashfs-tools-4.7.5.tar.gz"
+  ],
+  "work_sources": []
+}

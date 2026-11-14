@@ -1,7 +1,7 @@
 {
   "name": "kde-gtk-config",
   "version": "6.8.2",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libKF6ColorScheme.so.6",

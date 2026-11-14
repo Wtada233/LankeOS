@@ -1,0 +1,17 @@
+{
+  "name": "perl-algorithm-diff",
+  "version": "1.201",
+  "release": 1,
+  "deps": [
+    "perl"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://cpan.metacpan.org/authors/id/R/RJ/RJBS/Algorithm-Diff-1.201.tar.gz"
+  ],
+  "work_sources": []
+}

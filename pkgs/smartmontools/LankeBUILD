@@ -1,0 +1,34 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # smartctl 与 smartd 都按 sbin_PROGRAMS 安装，usr-merge 下统一落到 /usr/bin。
+    # libsystemd 提供 Type=notify，libcap-ng 供 smartd 降权。
+    ./configure --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --sbindir={BINDIR} \
+        --with-systemdsystemunitdir={LIBDIR}/systemd/system \
+        --with-systemdenvfile={SYSCONFDIR}/conf.d/smartd \
+        --with-smartdscriptdir={DATADIR}/smartmontools \
+        --with-smartdplugindir={DATADIR}/smartmontools/smartd_warning.d \
+        --with-libsystemd=yes \
+        --with-libcap-ng=yes \
+        --without-selinux
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    install -Dm644 COPYING "{STAGING_ROOT}{DATADIR}/licenses/smartmontools/COPYING"
+    install -d "{STAGING_ROOT}{DATADIR}/doc/smartmontools"
+    install -m644 AUTHORS ChangeLog ChangeLog-6.0-7.0 INSTALL NEWS README TODO \
+        "{STAGING_ROOT}{DATADIR}/doc/smartmontools/"
+
+    # smartd.service 的 EnvironmentFile；上游不安装，给一个空的默认值
+    install -d "{STAGING_ROOT}{SYSCONFDIR}/conf.d"
+    printf '%s\n' '# Extra options for smartd, read by smartd.service' '#smartd_opts=""' \
+        > "{STAGING_ROOT}{SYSCONFDIR}/conf.d/smartd"
+}
+
+lankebuild_package() {
+    :
+}

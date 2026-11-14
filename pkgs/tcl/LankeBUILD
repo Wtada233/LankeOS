@@ -14,7 +14,7 @@ lankebuild_build() {
     TCLSH_VERSIONED=tclsh${TCL_MAJOR}.${TCL_MINOR}  # tclsh9.0
     cd unix
 
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --mandir={MANDIR} --disable-static --with-system-sqlite
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --mandir={MANDIR} --disable-static
     make -j$(nproc)
     sed -e "s|$SRCDIR/unix|{LIBDIR}|"         -e "s|$SRCDIR|{INCLUDEDIR}|"          -i tclConfig.sh
 

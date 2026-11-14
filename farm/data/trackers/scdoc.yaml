@@ -1,0 +1,12 @@
+pkg-name: scdoc
+version-source: sources[0]
+sources:
+  - tracker-template: script
+    script: |
+      #!/bin/bash
+      set -e
+      repo="https://git.sr.ht/~sircmpwn/scdoc"
+      tags=$(git ls-remote --tags --refs "$repo" | sed 's#.*refs/tags/##')
+      tag=$(printf '%s\n' "$tags" | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -V | tail -n1)
+      test -n "$tag" || exit 1
+      echo "$tag|https://git.sr.ht/~sircmpwn/scdoc/archive/${tag}.tar.gz"

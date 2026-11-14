@@ -1,7 +1,7 @@
 {
   "name": "gdb",
   "version": "18.1",
-  "release": 3,
+  "release": 5,
   "deps": [
     "python"
   ],
@@ -28,6 +28,7 @@
     "base-devel",
     "boost",
     "expat",
+    "gettext",
     "gmp",
     "mpfr",
     "ncurses",

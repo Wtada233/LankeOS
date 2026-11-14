@@ -1,0 +1,25 @@
+lankebuild_prepare() {
+    # 上游 tarball 自带 configure 与捆绑的 libburn/libisofs，不需要 autoreconf
+    :
+}
+
+lankebuild_build() {
+    # 开启全部可选库能力；对应库都写在 build_deps 里。
+    # 行编辑用 readline；libedit 只是 readline 缺失时的替代实现，不单独启用。
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
+        --enable-libreadline \
+        --enable-libacl \
+        --enable-xattr \
+        --enable-zlib \
+        --enable-libbz2 \
+        --enable-libcdio \
+        --enable-jtethreads
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    install -Dm644 COPYING "{STAGING_ROOT}{DATADIR}/licenses/xorriso/COPYING"
+}
+
+lankebuild_package() {
+    :
+}

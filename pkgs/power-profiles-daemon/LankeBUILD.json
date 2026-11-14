@@ -1,8 +1,12 @@
 {
   "name": "power-profiles-daemon",
   "version": "0.30",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "bash-completion",
+    "python",
+    "python-gobject"
+  ],
   "needed_so": [
     "libc.so.6@{GLIBC_2.2.5,GLIBC_2.34}",
     "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
@@ -15,11 +19,14 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "bash-completion",
     "glib",
     "libgudev",
     "meson",
     "ninja",
     "polkit",
+    "python-gobject",
+    "python-shtab",
     "upower"
   ],
   "sources": [

@@ -1,0 +1,26 @@
+{
+  "name": "python-dateutil",
+  "version": "4.0.0",
+  "release": 1,
+  "deps": [
+    "python-tzdata"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-hatch-fancy-pypi-readme",
+    "python-hatch-vcs",
+    "python-hatchling",
+    "python-installer",
+    "python-setuptools",
+    "python-setuptools-scm",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/18/39/b3927f3616f6223832f9b760e4208e8a7c7e1dea2b4d9ad7d32a5d214c3a/python_dateutil-4.0.0.tar.gz"
+  ],
+  "work_sources": []
+}

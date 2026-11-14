@@ -1,0 +1,7 @@
+pkg-name: cpio
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://ftp.gnu.org/gnu/cpio/
+    pattern: cpio-([\d.]+)\.tar\.gz
+    template: https://ftp.gnu.org/gnu/cpio/cpio-{version}.tar.gz

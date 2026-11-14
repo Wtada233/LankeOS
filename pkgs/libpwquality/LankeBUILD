@@ -8,7 +8,7 @@ lankebuild_build() {
         --prefix={PREFIX} \
         --sysconfdir={SYSCONFDIR} \
         --localstatedir=/var \
-        --disable-python-bindings \
+        --enable-python-bindings --with-python-binary=python3 \
         --enable-pam \
         --disable-static
     make -j$(nproc)

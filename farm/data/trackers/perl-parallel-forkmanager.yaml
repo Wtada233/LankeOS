@@ -1,0 +1,7 @@
+pkg-name: perl-parallel-forkmanager
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://cpan.metacpan.org/authors/id/Y/YA/YANICK/
+    pattern: Parallel-ForkManager-(\d[\d.]*)\.tar\.gz
+    template: https://cpan.metacpan.org/authors/id/Y/YA/YANICK/Parallel-ForkManager-{version}.tar.gz

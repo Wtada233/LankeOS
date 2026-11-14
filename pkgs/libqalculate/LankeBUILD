@@ -5,8 +5,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
         --enable-shared \
-        --disable-static \
-        --without-gui
+        --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

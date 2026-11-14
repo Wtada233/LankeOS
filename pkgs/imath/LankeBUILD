@@ -7,7 +7,7 @@ lankebuild_build() {
         -DCMAKE_INSTALL_PREFIX={PREFIX} \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_TESTING=OFF \
-        -DPYTHON=OFF
+        -DPYBIND11=ON -DPYTHON=ON
     ninja -C build -j$(nproc)
     DESTDIR={STAGING_ROOT} cmake --install build
 }

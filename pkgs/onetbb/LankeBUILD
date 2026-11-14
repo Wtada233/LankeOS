@@ -9,7 +9,7 @@ lankebuild_prepare() {
         -DTBB_STRICT=OFF \
         -DTCM_STRICT=OFF \
         -DTBB_TEST=OFF \
-        -DTBB4PY_BUILD=OFF
+        -DTBB4PY_BUILD=ON
 }
 
 lankebuild_build() {

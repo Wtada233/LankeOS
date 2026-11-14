@@ -1,7 +1,7 @@
 {
   "name": "sway",
   "version": "1.12",
-  "release": 3,
+  "release": 4,
   "deps": [
     "xwayland"
   ],

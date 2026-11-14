@@ -3,7 +3,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --disable-tools --disable-contrib --disable-webp
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --enable-tools --enable-contrib --disable-webp
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

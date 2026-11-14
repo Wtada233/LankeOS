@@ -1,0 +1,20 @@
+{
+  "name": "python-wheezy-template",
+  "version": "3.2.5",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/43/1d/b4fb6ee3f6a0af54ac26e0425b7947bd7d9ed786a75ca173a40640c25bc6/wheezy_template-3.2.5.tar.gz"
+  ],
+  "work_sources": []
+}

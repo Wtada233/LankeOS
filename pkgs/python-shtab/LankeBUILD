@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    # sdist 没有 .git；setuptools_scm 用 sdist 内的版本信息
+    export SETUPTOOLS_SCM_PRETEND_VERSION={ORIG_PKG_VER}
+}
+
+lankebuild_build() {
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find "{STAGING_ROOT}" -name __pycache__ -type d -exec rm -rf {} +
+}

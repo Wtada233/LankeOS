@@ -1,7 +1,7 @@
 {
   "name": "libsecret",
   "version": "0.21.8.2",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
@@ -20,7 +20,8 @@
     "gnutls",
     "gobject-introspection",
     "meson",
-    "ninja"
+    "ninja",
+    "vala"
   ],
   "sources": [
     "https://download.gnome.org/sources/libsecret/0.21/libsecret-0.21.8.2.tar.xz"

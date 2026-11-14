@@ -11,9 +11,7 @@ lankebuild_build() {
         -DCMAKE_SKIP_INSTALL_RPATH=ON \
         -DCMAKE_BUILD_TYPE=Release \
         -DKDE_INSTALL_USE_QT_SYS_PATHS=ON \
-        -DBUILD_QT5=OFF \
         -DBUILD_TESTING=OFF \
-        -DBUILD_PYTHON_BINDINGS=OFF \
         -W no-author ..
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install

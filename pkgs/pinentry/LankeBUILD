@@ -3,7 +3,8 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --enable-pinentry-tty --enable-pinentry-curses --disable-pinentry-gnome3 --disable-pinentry-qt --disable-pinentry-gtk2 
+    # pinentry 的 Qt 探测硬编码 -std=gnu++11，Qt6 要求 C++17；放在 CXXFLAGS 末尾覆盖
+    CXXFLAGS="-std=gnu++17 $CXXFLAGS" ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --enable-pinentry-tty --enable-pinentry-curses --enable-pinentry-gnome3 --enable-pinentry-qt --disable-pinentry-gtk2
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

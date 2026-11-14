@@ -1,16 +1,20 @@
 {
   "name": "onetbb",
   "version": "2023.2.0",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "python"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libhwloc.so.15",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.13,CXXABI_1.3.15,CXXABI_1.3.3,CXXABI_1.3.7,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.29,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
+    "libirml.so",
+    "libirml.so.1",
     "libtbb.so",
     "libtbb.so.12",
     "libtbbbind_2_5.so",
@@ -26,7 +30,12 @@
     "base-devel",
     "cmake",
     "hwloc",
-    "ninja"
+    "ninja",
+    "python",
+    "python-pip",
+    "python-setuptools",
+    "python-wheel",
+    "swig"
   ],
   "sources": [
     "https://github.com/uxlfoundation/oneTBB/archive/v2023.2.0/onetbb-2023.2.0.tar.gz"

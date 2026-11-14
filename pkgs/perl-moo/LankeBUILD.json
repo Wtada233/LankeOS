@@ -1,0 +1,23 @@
+{
+  "name": "perl-moo",
+  "version": "2.005005",
+  "release": 1,
+  "deps": [
+    "perl",
+    "perl-class-method-modifiers",
+    "perl-role-tiny",
+    "perl-sub-quote"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "perl-class-method-modifiers",
+    "perl-role-tiny",
+    "perl-sub-quote"
+  ],
+  "sources": [
+    "https://cpan.metacpan.org/authors/id/H/HA/HAARG/Moo-2.005005.tar.gz"
+  ],
+  "work_sources": []
+}

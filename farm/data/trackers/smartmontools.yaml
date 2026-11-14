@@ -1,0 +1,8 @@
+pkg-name: smartmontools
+version-source: sources[0]
+sources:
+  - tracker-template: sourceforge
+    pattern: smartmontools-(\d[\d.]*)\.tar\.gz
+    project: smartmontools
+    path: smartmontools
+    template: https://downloads.sourceforge.net/project/{project}/{path}/{path_version}/smartmontools-{version}.tar.gz

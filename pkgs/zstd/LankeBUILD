@@ -8,7 +8,7 @@ lankebuild_prepare() {
         -DCMAKE_BUILD_TYPE=Release \
         -DZSTD_BUILD_STATIC=OFF \
         -DZSTD_BUILD_TESTS=OFF \
-        -DZSTD_BUILD_CONTRIB=OFF \
+        -DZSTD_BUILD_CONTRIB=ON \
         -DZSTD_PROGRAMS_LINK_SHARED=ON
 }
 

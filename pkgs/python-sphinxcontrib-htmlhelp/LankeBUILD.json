@@ -1,0 +1,20 @@
+{
+  "name": "python-sphinxcontrib-htmlhelp",
+  "version": "2.1.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/43/93/983afd9aa001e5201eab16b5a444ed5b9b0a7a010541e0ddfbbfd0b2470c/sphinxcontrib_htmlhelp-2.1.0.tar.gz"
+  ],
+  "work_sources": []
+}

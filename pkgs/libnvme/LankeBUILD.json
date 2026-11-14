@@ -1,8 +1,10 @@
 {
   "name": "libnvme",
   "version": "1.16.2",
-  "release": 3,
-  "deps": [],
+  "release": 4,
+  "deps": [
+    "python"
+  ],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libcrypto.so.4@OPENSSL_4.0.0",
@@ -24,7 +26,9 @@
     "keyutils",
     "liburing",
     "meson",
-    "ninja"
+    "ninja",
+    "python",
+    "swig"
   ],
   "sources": [
     "https://github.com/linux-nvme/libnvme/archive/refs/tags/v1.16.2.tar.gz"

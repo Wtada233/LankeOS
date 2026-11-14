@@ -7,7 +7,7 @@ lankebuild_prepare() {
         -DBUILD_TESTING=OFF \
         -DWITH_GFLAGS=ON \
         -DWITH_PKGCONFIG=ON \
-        -DWITH_UNWIND=OFF
+        -DWITH_UNWIND=ON
 }
 
 lankebuild_build() {

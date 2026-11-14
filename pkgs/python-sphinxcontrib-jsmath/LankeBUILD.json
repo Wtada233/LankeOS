@@ -1,0 +1,20 @@
+{
+  "name": "python-sphinxcontrib-jsmath",
+  "version": "2.0.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/59/02/4f334c7fc3e54c51d2364575a41cd2fae6847e7f53001949f0be5f32e18b/sphinxcontrib_jsmath-2.0.0.tar.gz"
+  ],
+  "work_sources": []
+}

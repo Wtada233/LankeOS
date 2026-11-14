@@ -10,7 +10,7 @@ lankebuild_build() {
                    -Ddoc=disabled       \
                    -Dtests=disabled     \
                    -Dintrospection=enabled \
-                   -Dnls=disabled
+                   -Dnls=enabled
     echo "Building gst-plugins-base-{ORIG_PKG_VER}"
     ninja -j$(nproc)
     echo "Build complete."

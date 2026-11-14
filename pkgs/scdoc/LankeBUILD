@@ -1,0 +1,11 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    make PREFIX={PREFIX} -j$(nproc)
+}
+
+lankebuild_package() {
+    make PREFIX={PREFIX} DESTDIR={STAGING_ROOT} install
+}

@@ -6,7 +6,7 @@ lankebuild_build() {
     meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --default-library=shared --buildtype=release \
         -Dsd-bus-provider=libsystemd \
         -Dman-pages=disabled \
-        -Ddefault-wallpaper=false \
+        -Ddefault-wallpaper=true \
         -Dwerror=false
     ninja -C build -j$(nproc)
 }

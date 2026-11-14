@@ -1,0 +1,37 @@
+{
+  "name": "python-sphinx",
+  "version": "9.2.0",
+  "release": 1,
+  "deps": [
+    "python-alabaster",
+    "python-babel",
+    "python-docutils",
+    "python-imagesize",
+    "python-jinja",
+    "python-packaging",
+    "python-pygments",
+    "python-requests",
+    "python-roman-numerals",
+    "python-snowballstemmer",
+    "python-sphinxcontrib-applehelp",
+    "python-sphinxcontrib-devhelp",
+    "python-sphinxcontrib-htmlhelp",
+    "python-sphinxcontrib-jsmath",
+    "python-sphinxcontrib-qthelp",
+    "python-sphinxcontrib-serializinghtml"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/64/d4/413466f0be8b1cb0e3e43893a148b96d7462d0923d82b4166b21afc5f30c/sphinx-9.2.0.tar.gz"
+  ],
+  "work_sources": []
+}

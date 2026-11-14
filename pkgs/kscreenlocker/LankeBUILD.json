@@ -1,7 +1,7 @@
 {
   "name": "kscreenlocker",
   "version": "6.8.2",
-  "release": 5,
+  "release": 6,
   "deps": [],
   "needed_so": [
     "libKF6ConfigCore.so.6",

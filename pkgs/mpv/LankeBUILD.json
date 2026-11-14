@@ -1,7 +1,7 @@
 {
   "name": "mpv",
   "version": "0.42.0",
-  "release": 11,
+  "release": 12,
   "deps": [
     "ffnvcodec-headers",
     "wayland-protocols",
@@ -32,6 +32,7 @@
     "libjack.so.0",
     "libjpeg.so.62@LIBJPEG_6.2",
     "liblcms2.so.2",
+    "libluajit-5.1.so.2",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29}",
     "libpipewire-0.3.so.0",
     "libplacebo.so.387",
@@ -78,6 +79,7 @@
     "libxrandr",
     "libxscrnsaver",
     "libxv",
+    "luajit",
     "mesa",
     "meson",
     "ninja",

@@ -1,0 +1,5 @@
+pkg-name: python-roman-numerals
+version-source: sources[0]
+sources:
+  - tracker-template: pypi
+    project: roman-numerals

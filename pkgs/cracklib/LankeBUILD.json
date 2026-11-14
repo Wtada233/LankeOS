@@ -1,10 +1,12 @@
 {
   "name": "cracklib",
   "version": "2.10.3",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "python"
+  ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
     "libz.so.1"
   ],
   "provides_soname": [
@@ -13,6 +15,8 @@
   ],
   "build_deps": [
     "base-devel",
+    "python",
+    "python-setuptools",
     "zlib"
   ],
   "sources": [

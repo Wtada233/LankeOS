@@ -1,7 +1,7 @@
 {
   "name": "rsync",
   "version": "3.5.2",
-  "release": 5,
+  "release": 6,
   "deps": [
     "bash"
   ],
@@ -12,6 +12,7 @@
     "libidn2.so.0@IDN2_0.0.0",
     "liblz4.so.1",
     "libpopt.so.0@LIBPOPT_0",
+    "libxxhash.so.0",
     "libz.so.1",
     "libzstd.so.1"
   ],
@@ -24,6 +25,7 @@
     "libidn2",
     "lz4",
     "popt",
+    "xxhash",
     "zlib",
     "zstd"
   ],

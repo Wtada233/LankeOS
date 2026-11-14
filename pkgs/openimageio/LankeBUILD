@@ -9,7 +9,6 @@ lankebuild_prepare() {
         -DUSE_PYTHON=ON \
         -DOIIO_PYTHON_BINDINGS_BACKEND=pybind11 \
         -DUSE_QT=OFF \
-        -DUSE_OPENGL=OFF \
         -DOIIO_BUILD_TESTS=OFF \
         -DOIIO_BUILD_TOOLS=ON \
         -DOIIO_INTERNALIZE_FMT=OFF \

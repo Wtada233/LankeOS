@@ -10,7 +10,7 @@ lankebuild_build() {
     meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR}        \
                    --buildtype=release  \
                    -Ddoc=disabled       \
-                   -Dnls=disabled       \
+                   -Dnls=enabled       \
                    -Dtests=disabled     \
                    -Dexamples=disabled
     echo "Building gst-plugins-good-{ORIG_PKG_VER}"

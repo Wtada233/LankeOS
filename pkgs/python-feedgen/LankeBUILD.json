@@ -1,0 +1,23 @@
+{
+  "name": "python-feedgen",
+  "version": "1.0.0",
+  "release": 1,
+  "deps": [
+    "python-dateutil",
+    "python-lxml"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/6b/59/be0a6f852b5dfbf19e6c8e962c8f41407697f9f52a7902250ed98683ae89/feedgen-1.0.0.tar.gz"
+  ],
+  "work_sources": []
+}

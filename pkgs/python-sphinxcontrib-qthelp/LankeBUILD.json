@@ -1,0 +1,20 @@
+{
+  "name": "python-sphinxcontrib-qthelp",
+  "version": "2.0.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/68/bc/9104308fc285eb3e0b31b67688235db556cd5b0ef31d96f30e45f2e51cae/sphinxcontrib_qthelp-2.0.0.tar.gz"
+  ],
+  "work_sources": []
+}

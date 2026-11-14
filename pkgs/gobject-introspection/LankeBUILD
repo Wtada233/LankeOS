@@ -8,7 +8,7 @@ lankebuild_build() {
     meson setup .. \
         --prefix={PREFIX} \
         --buildtype=release \
-        -Dcairo=disabled
+        -Dcairo=enabled
     ninja -j$(nproc)
     DESTDIR="{STAGING_ROOT}" ninja install
 }

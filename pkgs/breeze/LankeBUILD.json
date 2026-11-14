@@ -1,7 +1,7 @@
 {
   "name": "breeze",
   "version": "6.8.2",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libKF6ColorScheme.so.6",

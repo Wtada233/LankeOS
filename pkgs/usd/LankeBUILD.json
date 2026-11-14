@@ -1,7 +1,7 @@
 {
   "name": "usd",
   "version": "26.11.1",
-  "release": 9,
+  "release": 10,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -17,6 +17,7 @@
     "libOpenColorIO.so.2.6",
     "libOpenImageIO.so.3.2",
     "libOpenImageIO_Util.so.3.2",
+    "libPtex.so.2.5",
     "libX11.so.6",
     "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libdraco.so.11",
@@ -59,6 +60,7 @@
     "openshadinglanguage",
     "opensubdiv",
     "openvdb",
+    "ptex",
     "python-jinja",
     "python-numpy",
     "zlib"

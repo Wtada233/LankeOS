@@ -1,7 +1,7 @@
 {
   "name": "gst-plugins-base",
   "version": "1.29.2",
-  "release": 3,
+  "release": 4,
   "deps": [
     "xwayland"
   ],
@@ -78,6 +78,7 @@
     "elfutils",
     "flac",
     "gdk-pixbuf",
+    "gettext",
     "glib",
     "gobject-introspection",
     "graphene",

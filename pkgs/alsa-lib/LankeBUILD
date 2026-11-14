@@ -4,7 +4,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./gitcompile --prefix={PREFIX} --disable-python --with-configdir=/usr/share/alsa --with-alsagconfdir=/etc/alsa/conf.d
+    ./gitcompile --prefix={PREFIX} --enable-python --enable-mixer-pymods --with-configdir=/usr/share/alsa --with-alsagconfdir=/etc/alsa/conf.d
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

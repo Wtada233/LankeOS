@@ -1,0 +1,7 @@
+pkg-name: xorriso
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://ftp.gnu.org/gnu/xorriso/
+    pattern: xorriso-([\d.]+)\.tar\.gz
+    template: https://ftp.gnu.org/gnu/xorriso/xorriso-{version}.tar.gz

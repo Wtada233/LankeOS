@@ -1,7 +1,7 @@
 {
   "name": "kf-kfilemetadata",
   "version": "6.31.0",
-  "release": 6,
+  "release": 7,
   "deps": [],
   "needed_so": [
     "libKF6Archive.so.6",
@@ -18,6 +18,7 @@
     "libexiv2.so.28",
     "libgcc_s.so.1@GCC_3.0",
     "libm.so.6@GLIBC_2.2.5",
+    "libpoppler-qt6.so.3",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.15,GLIBCXX_3.4.21,GLIBCXX_3.4.30,GLIBCXX_3.4.32}",
     "libtag.so.2"
   ],

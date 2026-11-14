@@ -9,7 +9,7 @@ lankebuild_build() {
                    --buildtype=release  \
                    -Ddoc=disabled       \
                    -Dintrospection=enabled \
-                   -Dnls=disabled       \
+                   -Dnls=enabled       \
                    -Dtests=disabled     \
                    -Dexamples=disabled
     echo "Building gst-plugins-bad-{ORIG_PKG_VER}"

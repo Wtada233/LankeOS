@@ -1,7 +1,7 @@
 {
   "name": "gst-plugins-bad",
   "version": "1.29.2",
-  "release": 5,
+  "release": 6,
   "deps": [
     "xwayland"
   ],
@@ -123,6 +123,7 @@
     "elfutils",
     "flac",
     "gdk-pixbuf",
+    "gettext",
     "glib",
     "gobject-introspection",
     "graphene",
@@ -142,6 +143,7 @@
     "libogg",
     "libpng",
     "libpulse",
+    "librsvg",
     "libsndfile",
     "libsoup",
     "libsrtp",
@@ -169,6 +171,7 @@
     "nasm",
     "nettle",
     "ninja",
+    "openexr",
     "openh264",
     "openjpeg",
     "opus",
@@ -180,9 +183,7 @@
     "vulkan-headers",
     "vulkan-loader",
     "wayland",
-    "zlib",
-    "librsvg",
-    "openexr"
+    "zlib"
   ],
   "sources": [
     "https://gstreamer.freedesktop.org/src/gst-plugins-bad/gst-plugins-bad-1.29.2.tar.xz"

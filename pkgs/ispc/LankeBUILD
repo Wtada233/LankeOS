@@ -7,7 +7,6 @@ lankebuild_prepare() {
         -DISPC_INCLUDE_EXAMPLES=OFF \
         -DISPC_INCLUDE_TESTS=OFF \
         -DISPC_INCLUDE_BENCHMARKS=OFF \
-        -DISPC_OPAQUE_PTR_MODE=OFF \
         -DISPC_STATIC_LINK=OFF \
         -DISPCRT_BUILD_STATIC=OFF \
         -DXE_ENABLED=OFF

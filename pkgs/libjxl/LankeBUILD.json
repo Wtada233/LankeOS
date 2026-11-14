@@ -1,17 +1,21 @@
 {
   "name": "libjxl",
   "version": "0.12.0",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libbrotlidec.so.1",
     "libbrotlienc.so.1",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
+    "libgif.so.7",
     "libhwy.so.1@HWY_0",
+    "libjpeg.so.62@{LIBJPEGTURBO_6.2,LIBJPEG_6.2}",
     "liblcms2.so.2",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43}",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.22,GLIBCXX_3.4.29,GLIBCXX_3.4.30}"
+    "libpng16.so.16@PNG16_0",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.5,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
     "libjxl.so.0.12@JXL_0",

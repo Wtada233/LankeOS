@@ -1,0 +1,18 @@
+{
+  "name": "asciidoctor",
+  "version": "2.0.26",
+  "release": 1,
+  "deps": [
+    "ruby"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "ruby"
+  ],
+  "sources": [
+    "https://github.com/asciidoctor/asciidoctor/archive/refs/tags/v2.0.26.tar.gz"
+  ],
+  "work_sources": []
+}

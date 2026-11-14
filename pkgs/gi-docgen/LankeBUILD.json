@@ -1,0 +1,27 @@
+{
+  "name": "gi-docgen",
+  "version": "2026.1",
+  "release": 1,
+  "deps": [
+    "python-jinja",
+    "python-markdown",
+    "python-markupsafe",
+    "python-packaging",
+    "python-pygments",
+    "python-typogrify"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/43/23/386dad008d1f1dc3c7188db63ea5bf82ceb41a5914fb050e6e09a14a457a/gi_docgen-2026.1.tar.gz"
+  ],
+  "work_sources": []
+}

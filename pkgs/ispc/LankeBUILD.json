@@ -1,7 +1,7 @@
 {
   "name": "ispc",
   "version": "1.32.0",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libLLVM.so.23.1@LLVM_23.1",

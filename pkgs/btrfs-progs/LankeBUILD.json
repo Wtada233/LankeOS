@@ -1,9 +1,10 @@
 {
   "name": "btrfs-progs",
   "version": "7.3",
-  "release": 4,
+  "release": 5,
   "deps": [
-    "bash"
+    "bash",
+    "python"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -27,6 +28,8 @@
   "build_deps": [
     "base-devel",
     "git",
+    "python",
+    "python-setuptools",
     "ripgrep",
     "zlib",
     "zstd"

@@ -1,0 +1,23 @@
+{
+  "name": "perl-cloc",
+  "version": "2.12",
+  "release": 1,
+  "deps": [
+    "perl",
+    "perl-algorithm-diff",
+    "perl-parallel-forkmanager",
+    "perl-regexp-common"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "perl-algorithm-diff",
+    "perl-parallel-forkmanager",
+    "perl-regexp-common"
+  ],
+  "sources": [
+    "https://github.com/AlDanial/cloc/archive/refs/tags/v2.12.tar.gz"
+  ],
+  "work_sources": []
+}

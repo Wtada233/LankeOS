@@ -14,15 +14,15 @@ lankebuild_prepare() {
 lankebuild_build() {
     meson setup build \
         --prefix={PREFIX} \
-        -Dcolor-management-lcms=false \
+        -Dcolor-management-lcms=true \
         -Dbackend-rdp=false \
         -Dbackend-vnc=false \
         -Dbackend-x11=false \
         -Dshell-ivi=false \
-        -Dshell-lua=false \
-        -Ddemo-clients=false \
-        -Dsimple-clients= \
-        -Dtools= \
+        -Dshell-lua=true \
+        -Ddemo-clients=true \
+        -Dsimple-clients=all \
+        -Dtools=calibrator,debug,info,terminal,touch-calibrator \
         -Dtests=false \
         -Ddoc=false
     ninja -C build -j$(nproc)

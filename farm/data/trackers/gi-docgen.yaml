@@ -1,0 +1,5 @@
+pkg-name: gi-docgen
+version-source: sources[0]
+sources:
+  - tracker-template: pypi
+    project: gi-docgen

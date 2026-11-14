@@ -1,7 +1,7 @@
 {
   "name": "gst-plugins-good",
   "version": "1.29.2",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libFLAC.so.14",
@@ -59,6 +59,7 @@
     "cairo",
     "flac",
     "gdk-pixbuf",
+    "gettext",
     "glib",
     "gst-plugins-base",
     "gstreamer",

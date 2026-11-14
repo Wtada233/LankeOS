@@ -1,0 +1,17 @@
+{
+  "name": "perl-role-tiny",
+  "version": "2.002005",
+  "release": 1,
+  "deps": [
+    "perl"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://cpan.metacpan.org/authors/id/H/HA/HAARG/Role-Tiny-2.002005.tar.gz"
+  ],
+  "work_sources": []
+}

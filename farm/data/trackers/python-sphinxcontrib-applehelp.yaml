@@ -1,0 +1,5 @@
+pkg-name: python-sphinxcontrib-applehelp
+version-source: sources[0]
+sources:
+  - tracker-template: pypi
+    project: sphinxcontrib-applehelp

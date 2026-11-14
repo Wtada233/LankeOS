@@ -1,0 +1,13 @@
+--- a/setup.py
++++ b/setup.py
+@@ -91,10 +91,6 @@
+     include_package_data=True,
+     exclude_package_data={'': ['.gitignore']},
+     zip_safe=True,
+-    setup_requires=[
+-        'setuptools_git >= 0.3',
+-        'sphinx',
+-    ],
+     install_requires=['lxml'],
+     tests_require=[],
+     entry_points={

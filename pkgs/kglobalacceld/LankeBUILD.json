@@ -1,7 +1,7 @@
 {
   "name": "kglobalacceld",
   "version": "6.8.2",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libKF6ConfigCore.so.6",

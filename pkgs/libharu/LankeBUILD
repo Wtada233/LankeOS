@@ -4,8 +4,6 @@ lankebuild_prepare() {
         -DCMAKE_INSTALL_LIBDIR=lib \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=ON \
-        -DLIBHPDF_SHARED=ON \
-        -DLIBHPDF_STATIC=OFF \
         -DLIBHPDF_EXAMPLES=OFF
 }
 

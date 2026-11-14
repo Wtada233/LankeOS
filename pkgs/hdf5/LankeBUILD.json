@@ -1,7 +1,7 @@
 {
   "name": "hdf5",
   "version": "2.2.0",
-  "release": 5,
+  "release": 6,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
@@ -18,7 +18,9 @@
     "libhdf5_hl.so",
     "libhdf5_hl.so.320",
     "libhdf5_hl_cpp.so",
-    "libhdf5_hl_cpp.so.320"
+    "libhdf5_hl_cpp.so.320",
+    "libhdf5_tools.so",
+    "libhdf5_tools.so.320"
   ],
   "build_deps": [
     "base-devel",

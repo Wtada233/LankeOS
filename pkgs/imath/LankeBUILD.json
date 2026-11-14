@@ -1,21 +1,38 @@
 {
   "name": "imath",
   "version": "3.2.3",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "python",
+    "python-numpy"
+  ],
   "needed_so": [
-    "libm.so.6@GLIBC_2.2.5",
-    "libstdc++.so.6@{GLIBCXX_3.4,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libboost_python315.so.1.92.0",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.32,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.38,GLIBC_2.43,GLIBC_2.44}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.15,CXXABI_1.3.2,CXXABI_1.3.3,CXXABI_1.3.5,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
     "libImath-3_2.so",
     "libImath-3_2.so.30",
-    "libImath.so"
+    "libImath.so",
+    "libPyBindImath.so",
+    "libPyBindImath_Python3_15-3_2.so",
+    "libPyBindImath_Python3_15-3_2.so.30",
+    "libPyImath.so",
+    "libPyImath_Python3_15-3_2.so",
+    "libPyImath_Python3_15-3_2.so.30"
   ],
   "build_deps": [
     "base-devel",
+    "boost",
     "cmake",
-    "ninja"
+    "ninja",
+    "pybind11",
+    "python",
+    "python-numpy"
   ],
   "sources": [
     "https://github.com/AcademySoftwareFoundation/Imath/archive/refs/tags/v3.2.3.tar.gz"

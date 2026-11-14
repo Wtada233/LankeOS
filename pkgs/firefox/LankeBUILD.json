@@ -1,7 +1,7 @@
 {
   "name": "firefox",
   "version": "159.0.1",
-  "release": 7,
+  "release": 8,
   "deps": [
     "ffmpeg"
   ],
@@ -63,6 +63,7 @@
     "libevent",
     "libffi",
     "libjpeg-turbo",
+    "libnl",
     "libvpx",
     "libwebp",
     "lld",

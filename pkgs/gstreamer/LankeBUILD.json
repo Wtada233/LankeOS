@@ -1,7 +1,7 @@
 {
   "name": "gstreamer",
   "version": "1.29.2",
-  "release": 3,
+  "release": 4,
   "deps": [
     "python"
   ],
@@ -41,6 +41,7 @@
     "elfutils",
     "flac",
     "gdk-pixbuf",
+    "gettext",
     "glib",
     "gobject-introspection",
     "graphene",

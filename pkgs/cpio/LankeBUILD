@@ -1,0 +1,22 @@
+lankebuild_prepare() {
+    # 上游 release tarball 已带 configure 与 gnulib，不需要 bootstrap
+    # 2.15 的函数指针声明不带原型，C23 下 GCC 按不兼容指针类型拒绝编译
+    patch -Np1 -i "{WORK_DIR}/../cpio-c23-conformity.patch" \
+        || patch -R --dry-run -p1 -i "{WORK_DIR}/../cpio-c23-conformity.patch" >/dev/null 2>&1 \
+        || exit 1
+}
+
+lankebuild_build() {
+    # rmt 只服务于远端磁带设备；禁掉后不产生额外的 helper
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
+        --mandir={DATADIR}/man \
+        --with-rmt=/dev/null
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    install -Dm644 COPYING "{STAGING_ROOT}{DATADIR}/licenses/cpio/COPYING"
+}
+
+lankebuild_package() {
+    :
+}
