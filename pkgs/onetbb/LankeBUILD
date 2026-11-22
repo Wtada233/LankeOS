@@ -18,4 +18,5 @@ lankebuild_build() {
 
 lankebuild_package() {
     DESTDIR="{STAGING_ROOT}" ninja -C build install
+    find "{STAGING_ROOT}" \( -name __pycache__ -o -name '*.py[co]' \) -prune -exec rm -rf {} +
 }

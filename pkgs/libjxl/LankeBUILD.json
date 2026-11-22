@@ -1,7 +1,7 @@
 {
   "name": "libjxl",
-  "version": "0.12.0",
-  "release": 4,
+  "version": "0.13.0",
+  "release": 5,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -18,11 +18,11 @@
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.5,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
-    "libjxl.so.0.12@JXL_0",
+    "libjxl.so.0.13@JXL_0",
     "libjxl.so@JXL_0",
     "libjxl_cms.so",
-    "libjxl_cms.so.0.12",
-    "libjxl_threads.so.0.12@JXL_0",
+    "libjxl_cms.so.0.13",
+    "libjxl_threads.so.0.13@JXL_0",
     "libjxl_threads.so@JXL_0"
   ],
   "build_deps": [
@@ -37,7 +37,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/libjxl/libjxl/archive/refs/tags/v0.12.0.tar.gz"
+    "https://github.com/libjxl/libjxl/archive/refs/tags/v0.13.0.tar.gz"
   ],
   "work_sources": []
 }

@@ -40,6 +40,8 @@
     "acl",
     "attr",
     "base-devel",
+    "curl",
+    "json-c",
     "libunistring",
     "libxml2",
     "ncurses"

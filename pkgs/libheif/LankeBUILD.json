@@ -39,6 +39,7 @@
     "dav1d",
     "ffmpeg",
     "gdk-pixbuf",
+    "glib",
     "libde265",
     "libjpeg-turbo",
     "libpng",

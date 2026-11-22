@@ -39,6 +39,7 @@
     "kf-kcoreaddons",
     "kf-ki18n",
     "ninja",
+    "poppler",
     "qt6-base",
     "qt6-tools",
     "taglib"

@@ -1,0 +1,28 @@
+--- a/src/libutils/oglapphelpers/CMakeLists.txt
++++ b/src/libutils/oglapphelpers/CMakeLists.txt
+@@ -208,10 +208,7 @@
+     )
+ endif()
+ 
+-install(TARGETS oglapphelpers 
+-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-)
++# LankeOS: oglapphelpers is an internal static helper; not installed
+ 
+ install(FILES ${INCLUDES}
+     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/OpenColorIO/oglapphelpers
+--- a/src/libutils/imageioapphelpers/CMakeLists.txt
++++ b/src/libutils/imageioapphelpers/CMakeLists.txt
+@@ -40,10 +40,7 @@
+         utils::strings
+ )
+ 
+-install(TARGETS imageioapphelpers
+-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-)
++# LankeOS: imageioapphelpers is an internal static helper; not installed
+ 
+ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/imageio.h
+     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/OpenColorIO/imageioapphelpers

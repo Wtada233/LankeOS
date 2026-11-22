@@ -1,7 +1,7 @@
 {
   "name": "noctalia",
   "version": "5.4.1",
-  "release": 4,
+  "release": 5,
   "deps": [
     "bash",
     "python"
@@ -22,8 +22,8 @@
     "libharfbuzz.so.0",
     "libical.so.4.0",
     "libjemalloc.so.2",
-    "libjxl.so.0.12@JXL_0",
-    "libjxl_threads.so.0.12@JXL_0",
+    "libjxl.so.0.13@JXL_0",
+    "libjxl_threads.so.0.13@JXL_0",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43,GLIBC_2.44}",
     "libmd4c.so.0",
     "libpam.so.0@LIBPAM_1.0",

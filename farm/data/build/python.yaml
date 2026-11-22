@@ -11,4 +11,4 @@
 # 本清单是权威，扫描只作提示 —— 别用扫描结果反删条目（gobject-introspection / boost
 # 都曾被误判为"冗余"，实际都在组里且都确有烙印产物）。
 rebuild-on-abichange: python
-packages: at-spi2-core bash-completion blueman blueprint-compiler boost clang gnome-tweaks gobject-introspection gyp kf-kapidox libblockdev libbytesize libdex libgexiv2 libixion liborcus libreoffice lsb materialx maturin meson meson-python newt openimageio openshadinglanguage packagekit python-* samba talloc tevent usd util-linux uv volume_key xcb-proto
+packages: alsa-lib asciidoc at-spi2-core bash-completion blueman blueprint-compiler boost btrfs-progs clang cracklib dtc gi-docgen gnome-tweaks gobject-introspection gyp hotdoc imath kf-kapidox libblockdev libbytesize libdex libgexiv2 libixion libnvme liborcus libpwquality libreoffice libxml2 libxslt lsb manifold materialx maturin meson meson-python nanobind newt nftables onetbb opencolorio openimageio openshadinglanguage openvdb packagekit python-* samba talloc tdb tevent usd util-linux uv volume_key xcb-proto

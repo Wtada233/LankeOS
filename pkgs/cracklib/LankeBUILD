@@ -19,6 +19,5 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    find "{STAGING_ROOT}" \( -name __pycache__ -o -name '*.py[co]' \) -prune -exec rm -rf {} +
 }

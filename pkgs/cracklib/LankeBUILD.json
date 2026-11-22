@@ -1,7 +1,7 @@
 {
   "name": "cracklib",
   "version": "2.10.3",
-  "release": 3,
+  "release": 4,
   "deps": [
     "python"
   ],

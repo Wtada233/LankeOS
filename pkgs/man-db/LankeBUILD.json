@@ -15,6 +15,7 @@
     "base-devel",
     "gdbm",
     "libpipeline",
+    "libseccomp",
     "zlib"
   ],
   "sources": [

@@ -1,7 +1,7 @@
 {
   "name": "libxml2",
   "version": "2.15.4",
-  "release": 3,
+  "release": 4,
   "deps": [
     "bash",
     "python"

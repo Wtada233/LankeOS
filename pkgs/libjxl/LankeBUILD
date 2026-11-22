@@ -1,5 +1,6 @@
 lankebuild_prepare() {
-    :
+    # 上游把仅工具使用的 jxl_extras_codec 静态库无条件 install；去掉该 install 规则
+    patch -Np1 -i "{WORK_DIR}/../fix-no-static-install.patch"
 }
 
 lankebuild_build() {
@@ -10,6 +11,5 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    # Installation handled by builder
     :
 }

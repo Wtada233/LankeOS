@@ -1,7 +1,7 @@
 {
   "name": "opencolorio",
   "version": "2.6.0",
-  "release": 3,
+  "release": 4,
   "deps": [
     "python",
     "python-numpy"
@@ -33,8 +33,10 @@
     "expat",
     "freeglut",
     "glew",
+    "glu",
     "imath",
     "lcms2",
+    "libglvnd",
     "minizip-ng",
     "ninja",
     "openexr",

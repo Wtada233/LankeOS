@@ -1,0 +1,12 @@
+--- a/lib/jxl_extras.cmake
++++ b/lib/jxl_extras.cmake
+@@ -153,8 +153,4 @@
+   VERSION ${JPEGXL_LIBRARY_VERSION}
+   SOVERSION ${JPEGXL_LIBRARY_SOVERSION}
+ )
+-install(TARGETS jxl_extras_codec
+-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-)
++# LankeOS: tools-only static library is not installed

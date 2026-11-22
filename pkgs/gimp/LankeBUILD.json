@@ -1,7 +1,7 @@
 {
   "name": "gimp",
   "version": "3.2.8",
-  "release": 3,
+  "release": 4,
   "deps": [
     "mypaint-brushes",
     "python-cairo",
@@ -44,8 +44,6 @@
     "libheif.so.1",
     "libjpeg.so.62@LIBJPEG_6.2",
     "libjson-glib-1.0.so.0@libjson-glib-1.0.so.0",
-    "libjxl.so.0.12@JXL_0",
-    "libjxl_threads.so.0.12@JXL_0",
     "liblcms2.so.2",
     "liblzma.so.5@XZ_5.0",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43,GLIBC_2.44}",

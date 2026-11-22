@@ -22,6 +22,7 @@
   "build_deps": [
     "base-devel",
     "gcr",
+    "glib",
     "gtk3",
     "libassuan",
     "libgpg-error",
